@@ -1,5 +1,6 @@
 using BudgetApp.Data;
 using BudgetApp.Models;
+using BudgetApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BudgetApp.Controllers;
 
 /// <summary>Bills that repeat every month. These are copied into each new month's budget.</summary>
-public class RecurringDebtsController(BudgetDbContext db) : Controller
+public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder) : Controller
 {
     public async Task<IActionResult> Index() =>
         View(await db.RecurringDebts.Include(d => d.Category)
@@ -36,10 +37,19 @@ public class RecurringDebtsController(BudgetDbContext db) : Controller
             await LoadCategoriesAsync();
             return View("Edit", debt);
         }
-        if (debt.Id == 0) db.RecurringDebts.Add(debt);
+        var isNew = debt.Id == 0;
+        if (isNew) db.RecurringDebts.Add(debt);
         else db.RecurringDebts.Update(debt);
         await db.SaveChangesAsync();
-        TempData["Message"] = $"Saved {debt.Title}. Changes apply to months you create from now on; existing months keep their own amounts.";
+        if (isNew)
+        {
+            await builder.AddToCurrentAndFutureMonthsAsync(debt: debt);
+            TempData["Message"] = $"Added {debt.Title}. It's now in this month's budget and every month after.";
+        }
+        else
+        {
+            TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts.";
+        }
         return RedirectToAction(nameof(Index));
     }
 

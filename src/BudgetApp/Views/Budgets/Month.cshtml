@@ -15,15 +15,15 @@
 
 @if (b is null)
 {
+    @* Only reached before any paychecks or bills exist; otherwise the month is built automatically. *@
     <div class="card empty-state mx-auto" style="max-width:34rem">
         <i class="bi bi-calendar-plus"></i>
-        <h2 class="h4 mt-2">No budget for @Model.Title yet</h2>
-        <p class="text-muted">Creating it adds a column for every payday in this month's budget and places each recurring debt under the paycheck before it's due. You can adjust anything afterwards.</p>
-        <form asp-action="Create" method="post">
-            <input type="hidden" name="year" value="@Model.Year" />
-            <input type="hidden" name="month" value="@Model.Month" />
-            <button class="btn btn-primary btn-lg px-4"><i class="bi bi-magic me-1"></i> Create @Model.Title budget</button>
-        </form>
+        <h2 class="h4 mt-2">Nothing to budget yet</h2>
+        <p class="text-muted">Add your paychecks and monthly bills, and @Model.Title will build itself from them: a column for every payday, with each bill under the paycheck before it's due.</p>
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+            <a asp-controller="Income" asp-action="Create" class="btn btn-primary"><i class="bi bi-wallet2 me-1"></i> Add a paycheck</a>
+            <a asp-controller="RecurringDebts" asp-action="Create" class="btn btn-outline-primary"><i class="bi bi-receipt me-1"></i> Add a bill</a>
+        </div>
     </div>
     return;
 }

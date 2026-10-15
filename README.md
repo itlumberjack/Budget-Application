@@ -6,11 +6,11 @@ A personal budget app built with ASP.NET Core MVC (.NET 10) and MySQL.
 
 - **Pay & Schedule**: each paycheck's take-home pay and schedule (weekly, every two weeks, twice a month, or monthly on a set day or the last day).
 - **Recurring Debts**: bills that repeat every month, each with a title, amount, category and optional due day.
-- **Monthly Budgets**: one page per month (`/budget/2026/10`), laid out like the family budget spreadsheet: one column per payday, with Income at the top of each column, then a section per category (Item | Company | Amount | Total), then what's left over from that paycheck. Paydays a few days apart (Sept 30 and Oct 2) share a column. On the month page you can:
+- **Monthly Budgets**: one page per month (`/budget/2026/10`), built automatically the first time you open it, laid out like the family budget spreadsheet: one column per payday, with Income at the top of each column, then a section per category (Item | Company | Amount | Total), then what's left over from that paycheck. Paydays a few days apart (Sept 30 and Oct 2) share a column. On the month page you can:
   - click any row to edit it, move it to another payday, or remove it; click **+ add** in a section to add an extra expense (extra credit card payment, kids pictures);
   - click **+ extra** in an Income section to add a bonus or overtime to a paycheck, or click a paycheck to change its amount or date;
   - click the dot at the end of a row to cycle its status: **Not paid** (white), **Pending** (yellow), **Complete** (green, the money has come out of your account);
-  - click **Add missing items** to pull in paychecks or recurring debts set up after the month was created, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
+  - new paychecks and recurring debts are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
 
   New bills go under the last paycheck on or before their due day, or the month's first paycheck if they have no due day.
 - **Pay & Schedule** has a "Budget this paycheck in the following month" option for end-of-month pay that covers next month's bills, so a Sept 30 paycheck appears in October.
