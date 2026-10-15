@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BudgetApp.Controllers;
 
 /// <summary>The month-by-month budget pages.</summary>
-public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Controller
+public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, BudgetAdvisor advisor) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -55,15 +55,61 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
                 .FirstAsync(b => b.Year == year && b.Month == month);
         }
 
-        budget?.PayPeriods.Sort((a, b) => a.PayDate != b.PayDate ? a.PayDate.CompareTo(b.PayDate) : string.Compare(a.Label, b.Label, StringComparison.Ordinal));
+        ViewBag.AdvisorReady = advisor.IsConfigured;
+        return View(await MonthModelAsync(year, month, budget));
+    }
 
-        return View(new MonthViewModel
+    private async Task<MonthViewModel> MonthModelAsync(int year, int month, MonthlyBudget? budget)
+    {
+        budget?.PayPeriods.Sort((a, b) => a.PayDate != b.PayDate ? a.PayDate.CompareTo(b.PayDate) : string.Compare(a.Label, b.Label, StringComparison.Ordinal));
+        return new MonthViewModel
         {
             Year = year,
             Month = month,
             Budget = budget,
             Categories = await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync()
-        });
+        };
+    }
+
+    /// <summary>Asks the AI helper how to spread this month's unpaid bills across its paydays. Changes nothing.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SuggestArrangement(int id, CancellationToken ct)
+    {
+        var budget = await db.MonthlyBudgets
+            .Include(b => b.PayPeriods).ThenInclude(p => p.Extras)
+            .Include(b => b.Expenses)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+        if (budget is null) return NotFound();
+        try
+        {
+            return Json(await advisor.SuggestAsync(await MonthModelAsync(budget.Year, budget.Month, budget), ct));
+        }
+        catch (AdvisorException ex)
+        {
+            return Json(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Applies the suggested moves the user kept. Each move is "expenseId:payPeriodId".</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApplyArrangement(int id, List<string> moves)
+    {
+        var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstOrDefaultAsync(b => b.Id == id);
+        if (budget is null) return NotFound();
+        var moved = 0;
+        foreach (var move in moves)
+        {
+            var parts = move.Split(':');
+            if (parts.Length != 2 || !int.TryParse(parts[0], out var expenseId) || !int.TryParse(parts[1], out var payId)) continue;
+            var expense = budget.Expenses.FirstOrDefault(e => e.Id == expenseId);
+            if (expense is null || budget.PayPeriods.All(p => p.Id != payId)) continue;
+            expense.PayPeriodId = payId;
+            moved++;
+        }
+        await db.SaveChangesAsync();
+        TempData["Message"] = moved == 1 ? "Moved 1 bill." : $"Moved {moved} bills.";
+        return RedirectToMonth(budget.Year, budget.Month);
     }
 
     [HttpPost, ValidateAntiForgeryToken]

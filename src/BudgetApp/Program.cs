@@ -19,6 +19,8 @@ builder.Services.AddDbContext<BudgetDbContext>(options =>
             ?? throw new InvalidOperationException("Connection string 'Budget' is missing from appsettings.json."));
 });
 builder.Services.AddScoped<BudgetBuilder>();
+// The optional AI helper on the month page. Needs Anthropic:ApiKey (see README).
+builder.Services.AddHttpClient<BudgetAdvisor>(c => c.Timeout = TimeSpan.FromMinutes(2));
 
 var app = builder.Build();
 

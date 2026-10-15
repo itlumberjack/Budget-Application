@@ -43,6 +43,25 @@ Out of the box `appsettings.json` has `"Database": { "Provider": "InMemory" }`, 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## AI helper (optional)
+
+The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and
+unpaid bills and suggest moving bills between paydays so no paycheck runs short and bills are paid
+before they're due. You see each suggested move with its reason and the left over per payday before
+and after, uncheck any you don't want, and click **Apply selected**. Nothing changes until you do.
+
+It needs your own Anthropic API key (from console.anthropic.com). Keep it out of the repo by storing
+it as a user secret or an environment variable:
+
+```bash
+dotnet user-secrets set "Anthropic:ApiKey" "<your key>" --project src/BudgetApp
+# or
+export Anthropic__ApiKey="<your key>"
+```
+
+`Anthropic:Model` in appsettings.json picks the model (default `claude-opus-5-5`). Each suggestion
+sends the month's paycheck amounts, bill names and amounts to Anthropic's API.
+
 ## Changing the data model
 
 ```
