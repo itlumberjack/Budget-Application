@@ -56,8 +56,8 @@
         <div class="col-6 col-md-3">
             <a class="card month-card position-relative p-3 h-100 @(i == 0 ? "bg-brand-soft" : "")" href="@Url.RouteUrl("month", new { year = d.Year, month = d.Month })">
                 <div class="fw-semibold">@d.ToString("MMMM")</div>
-                <div class="item-meta">@d.Year &middot; @(made ? "Open budget" : "Not started")</div>
-                <i class="bi @(made ? "bi-arrow-right-circle-fill text-brand" : "bi-plus-circle text-muted") position-absolute top-0 end-0 m-3 fs-5"></i>
+                <div class="item-meta">@d.Year &middot; @(made ? "Open budget" : "Ready to view")</div>
+                <i class="bi @(made ? "bi-arrow-right-circle-fill text-brand" : "bi-arrow-right-circle text-muted") position-absolute top-0 end-0 m-3 fs-5"></i>
             </a>
         </div>
     }
@@ -68,7 +68,7 @@
 {
     <div class="card empty-state">
         <i class="bi bi-calendar3"></i>
-        <p class="mt-2 mb-0 text-muted">No budgets yet. Pick a month above to start one.</p>
+        <p class="mt-2 mb-0 text-muted">No budgets yet. Pick a month above and it builds itself from your paychecks and bills.</p>
     </div>
 }
 else

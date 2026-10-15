@@ -43,6 +43,18 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
             .AsSplitQuery()
             .FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
 
+        // Build the month on first visit from the pay schedules and recurring debts,
+        // as long as there's something set up to build it from.
+        if (budget is null && (await db.IncomeSources.AnyAsync(s => s.IsActive) || await db.RecurringDebts.AnyAsync(d => d.IsActive)))
+        {
+            await builder.CreateMonthAsync(year, month);
+            budget = await db.MonthlyBudgets
+                .Include(b => b.PayPeriods).ThenInclude(p => p.Extras)
+                .Include(b => b.Expenses)
+                .AsSplitQuery()
+                .FirstAsync(b => b.Year == year && b.Month == month);
+        }
+
         budget?.PayPeriods.Sort((a, b) => a.PayDate != b.PayDate ? a.PayDate.CompareTo(b.PayDate) : string.Compare(a.Label, b.Label, StringComparison.Ordinal));
 
         return View(new MonthViewModel

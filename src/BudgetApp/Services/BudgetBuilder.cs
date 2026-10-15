@@ -25,7 +25,29 @@ public class BudgetBuilder(BudgetDbContext db)
     /// that isn't under a payday yet into one. Never changes amounts or moves bills that already
     /// have a payday, so manual adjustments are kept.
     /// </summary>
-    public async Task<(int paychecks, int debts)> SyncAsync(int budgetId)
+    public async Task<(int paychecks, int debts)> SyncAsync(int budgetId) =>
+        await SyncAsync(budgetId,
+            await db.IncomeSources.Where(s => s.IsActive).ToListAsync(),
+            await db.RecurringDebts.Where(d => d.IsActive).ToListAsync());
+
+    /// <summary>
+    /// Adds a newly created paycheck or bill to the months already built for this month and later,
+    /// so it shows up without anyone clicking "Add missing items". Past months are left alone.
+    /// </summary>
+    public async Task AddToCurrentAndFutureMonthsAsync(IncomeSource? source = null, RecurringDebt? debt = null)
+    {
+        var today = DateTime.Today;
+        var ids = await db.MonthlyBudgets
+            .Where(b => b.Year > today.Year || (b.Year == today.Year && b.Month >= today.Month))
+            .Select(b => b.Id)
+            .ToListAsync();
+        foreach (var id in ids)
+            await SyncAsync(id,
+                source is { IsActive: true } ? [source] : [],
+                debt is { IsActive: true } ? [debt] : []);
+    }
+
+    private async Task<(int paychecks, int debts)> SyncAsync(int budgetId, IReadOnlyList<IncomeSource> sources, IReadOnlyList<RecurringDebt> debts)
     {
         var budget = await db.MonthlyBudgets
             .Include(b => b.PayPeriods)
@@ -33,7 +55,7 @@ public class BudgetBuilder(BudgetDbContext db)
             .FirstAsync(b => b.Id == budgetId);
 
         var addedPay = 0;
-        foreach (var source in await db.IncomeSources.Where(s => s.IsActive).ToListAsync())
+        foreach (var source in sources)
         {
             foreach (var payday in PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month))
             {
@@ -53,7 +75,7 @@ public class BudgetBuilder(BudgetDbContext db)
         await db.SaveChangesAsync();
 
         var addedDebts = 0;
-        foreach (var debt in await db.RecurringDebts.Where(d => d.IsActive).ToListAsync())
+        foreach (var debt in debts)
         {
             if (budget.Expenses.Any(e => e.RecurringDebtId == debt.Id))
                 continue;

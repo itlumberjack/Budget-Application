@@ -1,12 +1,13 @@
 using BudgetApp.Data;
 using BudgetApp.Models;
+using BudgetApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Controllers;
 
 /// <summary>Take-home pay and the schedule each paycheck follows.</summary>
-public class IncomeController(BudgetDbContext db) : Controller
+public class IncomeController(BudgetDbContext db, BudgetBuilder builder) : Controller
 {
     public async Task<IActionResult> Index() =>
         View(await db.IncomeSources.OrderBy(s => s.Name).ToListAsync());
@@ -27,10 +28,19 @@ public class IncomeController(BudgetDbContext db) : Controller
         if (!ModelState.IsValid)
             return View("Edit", source);
 
-        if (source.Id == 0) db.IncomeSources.Add(source);
+        var isNew = source.Id == 0;
+        if (isNew) db.IncomeSources.Add(source);
         else db.IncomeSources.Update(source);
         await db.SaveChangesAsync();
-        TempData["Message"] = $"Saved {source.Name}. Months you create from now on use this pay. Use \"Add missing items\" on an existing month to pick up new paychecks.";
+        if (isNew)
+        {
+            await builder.AddToCurrentAndFutureMonthsAsync(source: source);
+            TempData["Message"] = $"Added {source.Name}. It's now in this month's budget and every month after.";
+        }
+        else
+        {
+            TempData["Message"] = $"Saved {source.Name}. New months use the new amount; months already built keep theirs so your adjustments aren't lost.";
+        }
         return RedirectToAction(nameof(Index));
     }
 
