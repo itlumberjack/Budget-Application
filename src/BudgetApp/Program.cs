@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+// User secrets (where the Anthropic API key lives) load in every environment, not only Development.
+builder.Configuration.AddUserSecrets<Program>(optional: true);
 
 builder.Services.AddControllersWithViews();
 // "InMemory" keeps everything in memory (handy for testing; data is lost when the app stops).

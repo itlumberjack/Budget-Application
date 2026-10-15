@@ -39,37 +39,34 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         Only move bills whose status is NotPaid. Never move a bill to the column it's already in.
         Give each move a short, plain reason (one sentence, no jargon) that mentions the due day or the
         shortfall it fixes. The summary is one or two friendly sentences about how the month looks.
-        Call the propose_arrangement tool with your answer.
         """;
 
-    private static readonly JsonObject Tool = new()
+    // The answer comes back as JSON matching this schema (structured outputs).
+    private static readonly JsonObject AnswerSchema = new()
     {
-        ["name"] = "propose_arrangement",
-        ["description"] = "Propose which unpaid bills should move to a different payday column.",
-        ["input_schema"] = new JsonObject
+        ["type"] = "object",
+        ["properties"] = new JsonObject
         {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
+            ["summary"] = new JsonObject { ["type"] = "string" },
+            ["moves"] = new JsonObject
             {
-                ["summary"] = new JsonObject { ["type"] = "string" },
-                ["moves"] = new JsonObject
+                ["type"] = "array",
+                ["items"] = new JsonObject
                 {
-                    ["type"] = "array",
-                    ["items"] = new JsonObject
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
                     {
-                        ["type"] = "object",
-                        ["properties"] = new JsonObject
-                        {
-                            ["bill_id"] = new JsonObject { ["type"] = "integer" },
-                            ["to_column"] = new JsonObject { ["type"] = "integer", ["description"] = "Column number to move the bill to" },
-                            ["reason"] = new JsonObject { ["type"] = "string" }
-                        },
-                        ["required"] = new JsonArray("bill_id", "to_column", "reason")
-                    }
+                        ["bill_id"] = new JsonObject { ["type"] = "integer" },
+                        ["to_column"] = new JsonObject { ["type"] = "integer", ["description"] = "Column number to move the bill to" },
+                        ["reason"] = new JsonObject { ["type"] = "string" }
+                    },
+                    ["required"] = new JsonArray("bill_id", "to_column", "reason"),
+                    ["additionalProperties"] = false
                 }
-            },
-            ["required"] = new JsonArray("summary", "moves")
-        }
+            }
+        },
+        ["required"] = new JsonArray("summary", "moves"),
+        ["additionalProperties"] = false
     };
 
     public async Task<ArrangementSuggestion> SuggestAsync(MonthViewModel month, CancellationToken ct = default)
@@ -85,10 +82,13 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         var request = new JsonObject
         {
             ["model"] = config["Anthropic:Model"] ?? "claude-opus-5-5",
-            ["max_tokens"] = 4000,
+            ["max_tokens"] = 16000,
             ["system"] = SystemPrompt,
-            ["tools"] = new JsonArray(Tool.DeepClone()),
-            ["tool_choice"] = new JsonObject { ["type"] = "tool", ["name"] = "propose_arrangement" },
+            ["output_config"] = new JsonObject
+            {
+                ["effort"] = "medium",
+                ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = AnswerSchema.DeepClone() }
+            },
             ["messages"] = new JsonArray(new JsonObject
             {
                 ["role"] = "user",
@@ -120,14 +120,34 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Anthropic API returned {Status}: {Body}", (int)response.StatusCode, body);
-            throw new AdvisorException((int)response.StatusCode is 401 or 403
-                ? "The AI service didn't accept the API key. Check Anthropic:ApiKey."
-                : "The AI service had a problem. Try again in a minute.");
+            var detail = ApiErrorMessage(body);
+            throw new AdvisorException((int)response.StatusCode switch
+            {
+                401 or 403 => "The AI service didn't accept the API key. Check Anthropic:ApiKey.",
+                429 => "The AI service is busy or the account is out of credit. Try again in a minute.",
+                _ => "The AI service turned the request down" + (detail is null ? "." : ": " + detail)
+            });
         }
 
-        var input = JsonNode.Parse(body)?["content"]?.AsArray()
-            .FirstOrDefault(c => (string?)c?["type"] == "tool_use")?["input"]
-            ?? throw new AdvisorException("The AI didn't send back a suggestion. Try again.");
+        var reply = JsonNode.Parse(body);
+        var stopReason = (string?)reply?["stop_reason"];
+        if (stopReason == "refusal")
+            throw new AdvisorException("The AI declined to answer this one. Try again.");
+        if (stopReason == "max_tokens")
+            throw new AdvisorException("The AI's answer was cut off. Try again.");
+
+        // Thinking blocks may come first; the answer is the text block.
+        var text = reply?["content"]?.AsArray()
+            .Where(c => (string?)c?["type"] == "text")
+            .Select(c => (string?)c?["text"])
+            .LastOrDefault();
+        JsonNode? input = null;
+        try { input = text is null ? null : JsonNode.Parse(text); } catch (JsonException) { }
+        if (input is null)
+        {
+            logger.LogWarning("Unexpected Anthropic API reply: {Body}", body);
+            throw new AdvisorException("The AI didn't send back a suggestion. Try again.");
+        }
 
         // Keep only moves that make sense for this month: an unpaid bill, a real column, a different one.
         var moves = new List<SuggestedMove>();
@@ -154,6 +174,13 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         }).ToList();
 
         return new ArrangementSuggestion((string?)input["summary"] ?? "", moves, outcomes);
+    }
+
+    /// <summary>The "message" from an API error body, if there is one.</summary>
+    private static string? ApiErrorMessage(string body)
+    {
+        try { return (string?)JsonNode.Parse(body)?["error"]?["message"]; }
+        catch (JsonException) { return null; }
     }
 
     /// <summary>The month as plain text for the prompt.</summary>
