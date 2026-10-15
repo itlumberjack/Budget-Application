@@ -53,11 +53,12 @@ public class BudgetBuilder(BudgetDbContext db)
             .Include(b => b.PayPeriods)
             .Include(b => b.Expenses)
             .FirstAsync(b => b.Id == budgetId);
+        var rules = await GetRulesAsync();
 
         var addedPay = 0;
         foreach (var source in sources)
         {
-            foreach (var payday in PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month))
+            foreach (var payday in PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month, rules))
             {
                 if (budget.PayPeriods.Any(p => p.IncomeSourceId == source.Id && p.PayDate.Date == payday))
                     continue;
@@ -99,6 +100,48 @@ public class BudgetBuilder(BudgetDbContext db)
 
         await db.SaveChangesAsync();
         return (addedPay, addedDebts);
+    }
+
+    public async Task<BudgetRules> GetRulesAsync() =>
+        await db.BudgetRules.FirstOrDefaultAsync() ?? new BudgetRules();
+
+    /// <summary>
+    /// After the budget rules change, moves paychecks in this month's and later months' budgets to the
+    /// month the rules now put them in (bringing their bills along), then fills in any paydays that now
+    /// belong to each month. Older months are left as they are.
+    /// </summary>
+    public async Task<int> ApplyRulesToCurrentAndFutureMonthsAsync()
+    {
+        var rules = await GetRulesAsync();
+        var thisMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var sources = await db.IncomeSources.ToDictionaryAsync(s => s.Id);
+        var moved = 0;
+
+        var paychecks = await db.PayPeriods.Include(p => p.MonthlyBudget)
+            .Where(p => p.IncomeSourceId != null)
+            .ToListAsync();
+        // Last month is included so its end-of-month paycheck can move into this month (and back again).
+        foreach (var pay in paychecks.Where(p => p.MonthlyBudget!.FirstDay >= thisMonth.AddMonths(-1)).OrderBy(p => p.PayDate))
+        {
+            if (!sources.TryGetValue(pay.IncomeSourceId!.Value, out var source)) continue;
+            var belongs = PaySchedule.BudgetMonthFor(source, pay.PayDate, rules);
+            var current = pay.MonthlyBudget!.FirstDay;
+            if (belongs == current || (belongs < thisMonth && current < thisMonth)) continue;
+            var offset = (belongs.Year - current.Year) * 12 + belongs.Month - current.Month;
+            if (offset is 1 or -1)
+            {
+                await MovePaycheckAsync(pay.Id, offset);
+                moved++;
+            }
+        }
+
+        var ids = await db.MonthlyBudgets
+            .Where(b => b.Year > thisMonth.Year || (b.Year == thisMonth.Year && b.Month >= thisMonth.Month))
+            .OrderBy(b => b.Year).ThenBy(b => b.Month)
+            .Select(b => b.Id).ToListAsync();
+        foreach (var id in ids)
+            await SyncAsync(id);
+        return moved;
     }
 
     /// <summary>

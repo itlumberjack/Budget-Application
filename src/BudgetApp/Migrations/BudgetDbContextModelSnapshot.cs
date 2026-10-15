@@ -68,6 +68,31 @@ namespace BudgetApp.Migrations
                     b.ToTable("BudgetExpenses");
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.BudgetRules", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EndOfMonthPayGoesToNextMonth")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("WeeklyClosestToFirstStartsMonth")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BudgetRules");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            EndOfMonthPayGoesToNextMonth = false,
+                            WeeklyClosestToFirstStartsMonth = false
+                        });
+                });
+
             modelBuilder.Entity("BudgetApp.Models.Category", b =>
                 {
                     b.Property<int>("Id")
