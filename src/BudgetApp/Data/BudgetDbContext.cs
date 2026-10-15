@@ -7,6 +7,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
 {
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
     public DbSet<RecurringDebt> RecurringDebts => Set<RecurringDebt>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
     public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
@@ -28,6 +29,8 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
 
         // Removing a paycheck moves its bills to "Not assigned" rather than deleting them.
         b.Entity<BudgetExpense>().HasOne(e => e.PayPeriod).WithMany().OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<BudgetRules>().HasData(new BudgetRules { Id = 1 });
 
         // Starter categories, matching the sections of the family's budget spreadsheet.
         b.Entity<Category>().HasData(

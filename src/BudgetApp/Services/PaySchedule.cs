@@ -4,15 +4,45 @@ namespace BudgetApp.Services;
 
 public static class PaySchedule
 {
-    /// <summary>
-    /// The paydays that belong to a month's budget. Usually the paydays inside the month, but for a
-    /// paycheck marked "budget in the following month" it's the paydays in the month before.
-    /// </summary>
-    public static IReadOnlyList<DateTime> PaydaysForBudget(IncomeSource source, int year, int month)
+    /// <summary>The paydays that belong to a month's budget, after applying the household's budget rules.</summary>
+    public static IReadOnlyList<DateTime> PaydaysForBudget(IncomeSource source, int year, int month, BudgetRules? rules = null)
     {
-        if (!source.CountsTowardNextMonth) return PaydaysInMonth(source, year, month);
-        var previous = new DateTime(year, month, 1).AddMonths(-1);
-        return PaydaysInMonth(source, previous.Year, previous.Month);
+        var target = new DateTime(year, month, 1);
+        var previous = target.AddMonths(-1);
+        // A payday can only ever be budgeted in its own month or the one after.
+        return PaydaysInMonth(source, previous.Year, previous.Month)
+            .Concat(PaydaysInMonth(source, year, month))
+            .Where(d => BudgetMonthFor(source, d, rules) == target)
+            .ToList();
+    }
+
+    /// <summary>The first day of the month whose budget this payday belongs to.</summary>
+    public static DateTime BudgetMonthFor(IncomeSource source, DateTime payday, BudgetRules? rules = null)
+    {
+        var ownMonth = new DateTime(payday.Year, payday.Month, 1);
+        var nextMonth = ownMonth.AddMonths(1);
+
+        if (source.CountsTowardNextMonth)
+            return nextMonth;
+
+        if (rules?.EndOfMonthPayGoesToNextMonth == true && source.Frequency == PayFrequency.Monthly
+            && payday.Day == DateTime.DaysInMonth(payday.Year, payday.Month))
+            return nextMonth;
+
+        if (rules?.WeeklyClosestToFirstStartsMonth == true && source.Frequency == PayFrequency.Weekly)
+        {
+            var following = payday.AddDays(7);
+            if (following.Month != payday.Month)
+            {
+                // This is the last payday of its month. It starts next month if it's at least as close
+                // to the 1st as the following payday is.
+                var daysBefore = (nextMonth - payday.Date).Days;
+                var daysAfter = (following.Date - nextMonth).Days;
+                if (daysBefore <= daysAfter) return nextMonth;
+            }
+        }
+
+        return ownMonth;
     }
 
     /// <summary>Every payday for this income source that falls inside the given month.</summary>

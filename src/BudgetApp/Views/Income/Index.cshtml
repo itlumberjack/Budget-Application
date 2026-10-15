@@ -12,6 +12,31 @@
     <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a paycheck</a>
 </div>
 
+@{
+    var rules = (BudgetRules)ViewBag.Rules;
+}
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 mb-1"><i class="bi bi-sliders text-brand me-1"></i> Brad's rule</h2>
+        <p class="item-meta mb-3">Decide which month a paycheck near the end of the month pays for. Changes apply to this month and every month after; past months stay as they are.</p>
+        <form asp-action="SaveRules" method="post" id="rulesForm">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch" id="rule1" name="endOfMonthPayGoesToNextMonth" value="true"
+                       @(rules.EndOfMonthPayGoesToNextMonth ? "checked" : "") onchange="this.form.submit()" />
+                <label class="form-check-label fw-medium" for="rule1">End-of-month paychecks pay next month's bills</label>
+                <div class="item-meta">Monthly pay that lands on the last day of the month (like October 31) goes in the next month's budget.</div>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="rule2" name="weeklyClosestToFirstStartsMonth" value="true"
+                       @(rules.WeeklyClosestToFirstStartsMonth ? "checked" : "") onchange="this.form.submit()" />
+                <label class="form-check-label fw-medium" for="rule2">Weekly payday closest to the 1st starts the month</label>
+                <div class="item-meta">If October 30 is closer to November 1 than November 6 is, the October 30 check goes in November's budget. On a tie, the earlier payday wins.</div>
+            </div>
+            <noscript><button class="btn btn-sm btn-primary mt-2">Save rules</button></noscript>
+        </form>
+    </div>
+</div>
+
 @if (Model.Count == 0)
 {
     <div class="card empty-state">
