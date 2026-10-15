@@ -88,6 +88,9 @@
             <button type="button" class="btn btn-sm btn-outline-primary" data-jump="@i">@columns[i].Heading</button>
         }
     </div>
+    <button type="button" class="btn btn-sm btn-ai" data-bs-toggle="modal" data-bs-target="#aiModal">
+        <i class="bi bi-stars me-1"></i> Suggest arrangement
+    </button>
     <div class="form-check form-switch mb-0 small @(canHideEmpty ? "" : "d-none")">
         <input class="form-check-input" type="checkbox" role="switch" id="showEmpty" />
         <label class="form-check-label" for="showEmpty">Show empty sections</label>
@@ -373,6 +376,42 @@
     </div>
 </div>
 
+<!-- AI helper: suggests moving unpaid bills between paydays -->
+<div class="modal fade" id="aiModal" tabindex="-1" aria-labelledby="aiModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
+        <form class="modal-content" asp-action="ApplyArrangement" method="post" id="aiForm">
+            <input type="hidden" name="id" value="@b.Id" />
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="aiModalTitle"><i class="bi bi-stars text-ai me-1"></i> Suggested arrangement</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="aiLoading" class="text-center py-4">
+                    <div class="spinner-border text-ai" role="status"></div>
+                    <p class="text-muted mt-3 mb-0">Looking over @Model.Title's paydays and bills...</p>
+                </div>
+                <div id="aiError" class="alert alert-warning d-none mb-0"></div>
+                <div id="aiResult" class="d-none">
+                    <p id="aiSummary" class="mb-3"></p>
+                    <div id="aiMoves" class="list-group mb-3"></div>
+                    <h3 class="h6 text-muted">Left over per payday</h3>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-1">
+                            <thead><tr><th>Payday</th><th class="text-end">Now</th><th class="text-end">After</th></tr></thead>
+                            <tbody id="aiColumns"></tbody>
+                        </table>
+                    </div>
+                    <p class="small text-muted mb-0">Nothing changes until you apply. Uncheck any move you don't want.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" id="aiApply" disabled>Apply selected</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         // Payday pills scroll that column into view.
@@ -433,5 +472,44 @@
             const first = (e.relatedTarget.dataset.payIds || '').split(',')[0];
             if (first) e.target.querySelector('select[name=payPeriodId]').value = first;
         });
+        // AI helper: ask for a suggestion each time the dialog opens.
+        const aiForm = document.getElementById('aiForm');
+        const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        const nth = d => d + ([, 'st', 'nd', 'rd'][d % 100 >> 3 ^ 1 && d % 10] || 'th');
+        const esc = t => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+        document.getElementById('aiModal').addEventListener('show.bs.modal', async () => {
+            const show = id => ['aiLoading', 'aiError', 'aiResult'].forEach(x => document.getElementById(x).classList.toggle('d-none', x !== id));
+            const apply = document.getElementById('aiApply');
+            show('aiLoading');
+            apply.disabled = true;
+            try {
+                const res = await fetch('@Url.Action("SuggestArrangement")', { method: 'POST', body: new FormData(aiForm) });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                document.getElementById('aiSummary').textContent = data.summary;
+                document.getElementById('aiMoves').innerHTML = data.moves.length
+                    ? data.moves.map(m => `
+                        <label class="list-group-item d-flex gap-3 align-items-start">
+                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" name="moves" value="${m.expenseId}:${m.toPayPeriodId}" checked>
+                            <span class="flex-grow-1">
+                                <span class="d-flex justify-content-between gap-2"><strong>${esc(m.title)}</strong><span class="money">${money(m.amount)}</span></span>
+                                <span class="d-block small">${esc(m.from)} <i class="bi bi-arrow-right"></i> <strong>${esc(m.to)}</strong>${m.dueDay ? ` &middot; due the ${nth(m.dueDay)}` : ''}</span>
+                                <span class="d-block small text-muted">${esc(m.reason)}</span>
+                            </span>
+                        </label>`).join('')
+                    : '<div class="list-group-item text-muted"><i class="bi bi-check2-circle text-success me-1"></i> No moves needed. This month already works.</div>';
+                document.getElementById('aiColumns').innerHTML = data.columns.map(c => `
+                    <tr><td>${esc(c.heading)}</td>
+                        <td class="text-end money ${c.before < 0 ? 'text-danger' : ''}">${money(c.before)}</td>
+                        <td class="text-end money fw-semibold ${c.after < 0 ? 'text-danger' : 'text-success'}">${money(c.after)}</td></tr>`).join('');
+                apply.disabled = data.moves.length === 0;
+                show('aiResult');
+            } catch (err) {
+                document.getElementById('aiError').textContent = err.message || 'Something went wrong. Try again.';
+                show('aiError');
+            }
+        });
+        aiForm.addEventListener('change', () =>
+            document.getElementById('aiApply').disabled = !aiForm.querySelector('input[name=moves]:checked'));
     </script>
 }
