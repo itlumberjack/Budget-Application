@@ -66,7 +66,7 @@ h1, .h1 { font-weight: 700; letter-spacing: -.02em; font-size: 1.75rem; }
 
 .tab-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   background: #fff; border-top: 1px solid rgba(0,0,0,.08); box-shadow: 0 -2px 10px rgba(0,0,0,.06);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -160,3 +160,15 @@ h1, .h1 { font-weight: 700; letter-spacing: -.02em; font-size: 1.75rem; }
 }
 .btn-ai:hover, .btn-ai:focus-visible { filter: brightness(1.08); }
 #aiMoves .list-group-item { cursor: pointer; }
+
+/* Debt payoff */
+.debt-free-date { font-size: 1.75rem; font-weight: 700; color: var(--brand-dark); line-height: 1.2; }
+.debt-chart { width: 100%; height: auto; display: block; }
+.debt-chart text { font-size: 11px; fill: #6c757d; }
+.debt-chart .grid { stroke: #e9ecef; stroke-width: 1; }
+.debt-chart polyline { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
+.debt-chart .line-plan, .legend-line.line-plan { stroke: var(--brand); background: var(--brand); }
+.debt-chart .line-baseline, .legend-line.line-baseline { stroke: #adb5bd; background: #adb5bd; stroke-dasharray: 6 4; }
+.legend-line { display: inline-block; width: 1.4rem; height: 3px; vertical-align: middle; border-radius: 2px; }
+.schedule > summary { cursor: pointer; }
+.loan-details > summary { cursor: pointer; }
