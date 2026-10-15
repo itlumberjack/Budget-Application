@@ -160,3 +160,11 @@ h1, .h1 { font-weight: 700; letter-spacing: -.02em; font-size: 1.75rem; }
 }
 .btn-ai:hover, .btn-ai:focus-visible { filter: brightness(1.08); }
 #aiMoves .list-group-item { cursor: pointer; }
+
+/* Shift the first payday back a month or the last one forward */
+.sheet-heading { position: relative; padding-left: 2.2rem; padding-right: 2.2rem; }
+.shift-form { position: absolute; top: .15rem; }
+.shift-prev { left: 0; }
+.shift-next { right: 0; }
+.shift-btn { --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .45rem; color: var(--brand); background: var(--brand-soft); border-radius: 999px; }
+.shift-btn:hover { background: var(--brand); color: #fff; }

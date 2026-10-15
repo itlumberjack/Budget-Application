@@ -158,6 +158,12 @@ public class PayPeriod
 
     public List<PayPeriodExtra> Extras { get; set; } = new();
 
+    /// <summary>
+    /// Shifted to another month by hand. Brad's rule leaves these where they were put; moving one back
+    /// to the month it falls in clears this.
+    /// </summary>
+    public bool ManuallyMoved { get; set; }
+
     [NotMapped]
     public decimal Total => BaseAmount + Extras.Sum(e => e.Amount);
 }
