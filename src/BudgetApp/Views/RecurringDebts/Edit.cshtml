@@ -76,7 +76,7 @@
 
     <div class="d-flex gap-2 mt-4">
         <button class="btn btn-primary px-4"><i class="bi bi-check-lg"></i> Save</button>
-        <a asp-action="Index" class="btn btn-light border">Cancel</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
         @if (Model.Id != 0)
         {
             <button type="submit" class="btn btn-outline-danger ms-auto" formaction="@Url.Action("Delete", new { id = Model.Id })" formnovalidate

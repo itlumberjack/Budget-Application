@@ -1,4 +1,7 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
-
-// Write your JavaScript code.
+// Header button: switch between the dark (default) and light themes and remember the choice.
+document.getElementById('themeToggle')?.addEventListener('click', () => {
+    const root = document.documentElement;
+    const theme = root.dataset.bsTheme === 'dark' ? 'light' : 'dark';
+    root.dataset.bsTheme = theme;
+    try { localStorage.setItem('budget.theme', theme); } catch { }
+});

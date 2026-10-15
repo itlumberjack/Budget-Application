@@ -10,11 +10,15 @@
     };
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1f6f6a" />
+    <meta name="theme-color" content="#0f2f2d" />
+    <script>
+        // Dark unless light was picked with the header button (see site.js). Runs before the page draws so it doesn't flash.
+        try { if (localStorage.getItem('budget.theme') === 'light') document.documentElement.dataset.bsTheme = 'light'; } catch { }
+    </script>
     <title>@ViewData["Title"] - Family Budget</title>
     <script type="importmap"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,6 +47,9 @@
                         </li>
                     }
                 </ul>
+                <button type="button" class="btn theme-toggle icon-btn rounded-circle ms-auto ms-md-2" id="themeToggle" title="Switch between dark and light" aria-label="Switch between dark and light">
+                    <i class="bi bi-sun"></i><i class="bi bi-moon-stars"></i>
+                </button>
             </div>
         </nav>
     </header>
