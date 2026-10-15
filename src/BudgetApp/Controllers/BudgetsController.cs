@@ -130,6 +130,19 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
         return RedirectToMonth(pay.MonthlyBudget!.Year, pay.MonthlyBudget.Month, $"pay-{id}");
     }
 
+    /// <summary>Moves a paycheck to the next (offset 1) or previous (offset -1) month's budget.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> MovePaycheck(int id, int offset)
+    {
+        if (offset is not (1 or -1)) return BadRequest();
+        var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
+        if (pay is null) return NotFound();
+        var from = pay.MonthlyBudget!;
+        var to = await builder.MovePaycheckAsync(id, offset);
+        TempData["Message"] = $"Moved {pay.Label}'s {pay.PayDate:MMMM d} paycheck to {to.Title}. You're looking at {to.Title} now.";
+        return RedirectToMonth(to.Year, to.Month);
+    }
+
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> DeletePaycheck(int id)
     {
