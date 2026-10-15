@@ -27,8 +27,8 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder) : Contr
 
         var moved = await builder.ApplyRulesToCurrentAndFutureMonthsAsync();
         TempData["Message"] = moved == 0
-            ? "Budget rules saved. They apply to this month and every month after."
-            : $"Budget rules saved. {moved} paycheck(s) moved to the month the rules put them in, along with the bills they cover.";
+            ? "Brad's rule saved. It applies to this month and every month after."
+            : $"Brad's rule saved. {moved} paycheck(s) moved to the month the rule puts them in, along with the bills they cover.";
         return RedirectToAction(nameof(Index));
     }
 
