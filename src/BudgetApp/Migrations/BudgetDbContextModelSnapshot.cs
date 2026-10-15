@@ -31,10 +31,17 @@ namespace BudgetApp.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Company")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
                     b.Property<int>("MonthlyBudgetId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PayPeriodId")
                         .HasColumnType("int");
 
                     b.Property<int?>("RecurringDebtId")
@@ -53,6 +60,8 @@ namespace BudgetApp.Migrations
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("MonthlyBudgetId");
+
+                    b.HasIndex("PayPeriodId");
 
                     b.HasIndex("RecurringDebtId");
 
@@ -96,43 +105,43 @@ namespace BudgetApp.Migrations
                         new
                         {
                             Id = 3,
-                            Name = "Transportation",
+                            Name = "Insurance",
                             SortOrder = 30
                         },
                         new
                         {
                             Id = 4,
-                            Name = "Insurance",
+                            Name = "Loans",
                             SortOrder = 40
                         },
                         new
                         {
                             Id = 5,
-                            Name = "Debt",
+                            Name = "Investments",
                             SortOrder = 50
                         },
                         new
                         {
                             Id = 6,
-                            Name = "Groceries & Household",
+                            Name = "Child Care",
                             SortOrder = 60
                         },
                         new
                         {
                             Id = 7,
-                            Name = "Kids",
+                            Name = "Subscriptions",
                             SortOrder = 70
                         },
                         new
                         {
                             Id = 8,
-                            Name = "Subscriptions",
+                            Name = "Household Needs",
                             SortOrder = 80
                         },
                         new
                         {
                             Id = 9,
-                            Name = "Savings",
+                            Name = "Additional Deductions",
                             SortOrder = 90
                         },
                         new
@@ -151,6 +160,9 @@ namespace BudgetApp.Migrations
 
                     b.Property<DateTime?>("AnchorDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("CountsTowardNextMonth")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int?>("DayOfMonth")
                         .HasColumnType("int");
@@ -266,6 +278,10 @@ namespace BudgetApp.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Company")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
@@ -298,6 +314,11 @@ namespace BudgetApp.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("BudgetApp.Models.PayPeriod", "PayPeriod")
+                        .WithMany()
+                        .HasForeignKey("PayPeriodId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("BudgetApp.Models.RecurringDebt", "RecurringDebt")
                         .WithMany()
                         .HasForeignKey("RecurringDebtId")
@@ -306,6 +327,8 @@ namespace BudgetApp.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("MonthlyBudget");
+
+                    b.Navigation("PayPeriod");
 
                     b.Navigation("RecurringDebt");
                 });

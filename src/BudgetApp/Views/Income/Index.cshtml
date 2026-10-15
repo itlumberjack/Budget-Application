@@ -26,7 +26,7 @@ else
                 .Where(d => d >= today).Cast<DateTime?>().FirstOrDefault();
             <tr class="@(s.IsActive ? "" : "text-muted")">
                 <td>@s.Name @if (!s.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
-                <td>@Html.DisplayFor(_ => s.Frequency)@(s.Frequency == PayFrequency.Monthly ? (s.DayOfMonth is int d ? $" on day {d}" : " on the last day") : "")</td>
+                <td>@Html.DisplayFor(_ => s.Frequency)@(s.Frequency == PayFrequency.Monthly ? (s.DayOfMonth is int d ? $" on day {d}" : " on the last day") : "")@(s.CountsTowardNextMonth ? ", budgeted in the following month" : "")</td>
                 <td class="text-end money">@s.TakeHomeAmount.ToString("C")</td>
                 <td>@next?.ToString("ddd, MMM d")</td>
                 <td class="text-end text-nowrap">

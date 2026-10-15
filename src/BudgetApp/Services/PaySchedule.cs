@@ -4,6 +4,17 @@ namespace BudgetApp.Services;
 
 public static class PaySchedule
 {
+    /// <summary>
+    /// The paydays that belong to a month's budget. Usually the paydays inside the month, but for a
+    /// paycheck marked "budget in the following month" it's the paydays in the month before.
+    /// </summary>
+    public static IReadOnlyList<DateTime> PaydaysForBudget(IncomeSource source, int year, int month)
+    {
+        if (!source.CountsTowardNextMonth) return PaydaysInMonth(source, year, month);
+        var previous = new DateTime(year, month, 1).AddMonths(-1);
+        return PaydaysInMonth(source, previous.Year, previous.Month);
+    }
+
     /// <summary>Every payday for this income source that falls inside the given month.</summary>
     public static IReadOnlyList<DateTime> PaydaysInMonth(IncomeSource source, int year, int month)
     {

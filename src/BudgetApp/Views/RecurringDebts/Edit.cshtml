@@ -13,6 +13,11 @@
         <span asp-validation-for="Title" class="text-danger"></span>
     </div>
     <div class="mb-3">
+        <label asp-for="Company" class="form-label"></label>
+        <input asp-for="Company" class="form-control" placeholder="Optional, e.g. Opelika Utilities" />
+        <span asp-validation-for="Company" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
         <label asp-for="Amount" class="form-label"></label>
         <div class="input-group">
             <span class="input-group-text">$</span>
@@ -28,6 +33,7 @@
     <div class="mb-3">
         <label asp-for="DueDay" class="form-label"></label>
         <input asp-for="DueDay" class="form-control" placeholder="Optional, 1 to 31" />
+        <div class="form-text">Used to place the bill under the last paycheck before it's due. Without one, it goes under the month's first paycheck.</div>
         <span asp-validation-for="DueDay" class="text-danger"></span>
     </div>
     <div class="form-check mb-3">

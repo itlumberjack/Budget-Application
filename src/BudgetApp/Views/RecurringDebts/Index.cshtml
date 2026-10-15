@@ -16,12 +16,13 @@
 else
 {
     <table class="table">
-        <thead><tr><th>Title</th><th>Category</th><th>Due day</th><th class="text-end">Amount</th><th></th></tr></thead>
+        <thead><tr><th>Title</th><th>Company</th><th>Category</th><th>Due day</th><th class="text-end">Amount</th><th></th></tr></thead>
         <tbody>
         @foreach (var d in Model)
         {
             <tr class="@(d.IsActive ? "" : "text-muted")">
                 <td>@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
+                <td>@d.Company</td>
                 <td>@d.Category?.Name</td>
                 <td>@d.DueDay</td>
                 <td class="text-end money">@d.Amount.ToString("C")</td>
@@ -35,7 +36,7 @@ else
         }
         </tbody>
         <tfoot>
-            <tr class="fw-bold"><td colspan="3">Total per month (active)</td><td class="text-end money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</td><td></td></tr>
+            <tr class="fw-bold"><td colspan="4">Total per month (active)</td><td class="text-end money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</td><td></td></tr>
         </tfoot>
     </table>
 }

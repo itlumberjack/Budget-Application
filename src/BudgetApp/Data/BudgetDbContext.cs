@@ -26,16 +26,20 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
         b.Entity<BudgetExpense>().HasOne(e => e.RecurringDebt).WithMany().OnDelete(DeleteBehavior.SetNull);
         b.Entity<PayPeriod>().HasOne(p => p.IncomeSource).WithMany().OnDelete(DeleteBehavior.SetNull);
 
+        // Removing a paycheck moves its bills to "Not assigned" rather than deleting them.
+        b.Entity<BudgetExpense>().HasOne(e => e.PayPeriod).WithMany().OnDelete(DeleteBehavior.SetNull);
+
+        // Starter categories, matching the sections of the family's budget spreadsheet.
         b.Entity<Category>().HasData(
             new Category { Id = 1, Name = "Housing", SortOrder = 10 },
             new Category { Id = 2, Name = "Utilities", SortOrder = 20 },
-            new Category { Id = 3, Name = "Transportation", SortOrder = 30 },
-            new Category { Id = 4, Name = "Insurance", SortOrder = 40 },
-            new Category { Id = 5, Name = "Debt", SortOrder = 50 },
-            new Category { Id = 6, Name = "Groceries & Household", SortOrder = 60 },
-            new Category { Id = 7, Name = "Kids", SortOrder = 70 },
-            new Category { Id = 8, Name = "Subscriptions", SortOrder = 80 },
-            new Category { Id = 9, Name = "Savings", SortOrder = 90 },
+            new Category { Id = 3, Name = "Insurance", SortOrder = 30 },
+            new Category { Id = 4, Name = "Loans", SortOrder = 40 },
+            new Category { Id = 5, Name = "Investments", SortOrder = 50 },
+            new Category { Id = 6, Name = "Child Care", SortOrder = 60 },
+            new Category { Id = 7, Name = "Subscriptions", SortOrder = 70 },
+            new Category { Id = 8, Name = "Household Needs", SortOrder = 80 },
+            new Category { Id = 9, Name = "Additional Deductions", SortOrder = 90 },
             new Category { Id = 10, Name = "Other", SortOrder = 100 });
     }
 }
