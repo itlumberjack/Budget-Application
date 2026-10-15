@@ -1,4 +1,5 @@
 using BudgetApp.Data;
+using BudgetApp.Helpers;
 using BudgetApp.Models;
 using BudgetApp.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -12,9 +13,9 @@ public class DebtController(BudgetDbContext db) : Controller
     public async Task<IActionResult> Index()
     {
         var loans = await db.RecurringDebts.Where(d => d.IsActive && d.Balance > 0).OrderBy(d => d.Id).ToListAsync();
-        var settings = await SettingsAsync();
+        var settings = await db.GetDebtPlanAsync();
         var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.Amount, d.PayoffPriority)).ToList();
-        var firstMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(1);
+        var firstMonth = Dates.ThisMonth.AddMonths(1);
 
         PayoffPlan Run(PayoffStrategy s) =>
             DebtPlanner.Plan(inputs, s, settings.ExtraMonthly, firstMonth, settings.OneTimeAmount, settings.OneTimeMonth);
@@ -34,7 +35,7 @@ public class DebtController(BudgetDbContext db) : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> SavePlan(PayoffStrategy strategy, decimal extraMonthly, decimal oneTimeAmount, DateTime? oneTimeMonth)
     {
-        var settings = await SettingsAsync();
+        var settings = await db.GetDebtPlanAsync();
         if (Enum.IsDefined(strategy)) settings.Strategy = strategy;
         settings.ExtraMonthly = Math.Max(0, extraMonthly);
         settings.OneTimeAmount = Math.Max(0, oneTimeAmount);
@@ -59,7 +60,4 @@ public class DebtController(BudgetDbContext db) : Controller
         TempData["Message"] = "Saved the amounts owed.";
         return RedirectToAction(nameof(Index));
     }
-
-    private async Task<DebtPlanSettings> SettingsAsync() =>
-        await db.DebtPlanSettings.FindAsync(1) ?? db.DebtPlanSettings.Add(new DebtPlanSettings { Id = 1 }).Entity;
 }

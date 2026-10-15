@@ -1,3 +1,5 @@
+using BudgetApp.Helpers;
+
 namespace BudgetApp.Models;
 
 public class MonthViewModel
@@ -8,7 +10,7 @@ public class MonthViewModel
     public List<Category> Categories { get; init; } = new();
 
     public DateTime FirstDay => new(Year, Month, 1);
-    public string Title => FirstDay.ToString("MMMM yyyy");
+    public string Title => FirstDay.MonthTitle();
     public DateTime Previous => FirstDay.AddMonths(-1);
     public DateTime Next => FirstDay.AddMonths(1);
 

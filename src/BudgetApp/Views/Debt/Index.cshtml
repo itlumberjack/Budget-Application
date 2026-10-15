@@ -1,20 +1,8 @@
-@using System.ComponentModel.DataAnnotations
-@using System.Reflection
-@using BudgetApp.Services
 @model DebtPageModel
 @{
     ViewData["Title"] = "Debt Payoff";
     var plan = Model.Plan;
     var baseline = Model.MinimumOnly;
-    string Name(PayoffStrategy s) => typeof(PayoffStrategy).GetField(s.ToString())!.GetCustomAttribute<DisplayAttribute>()!.Name!;
-    string Span(int months)
-    {
-        var y = months / 12; var m = months % 12;
-        var parts = new List<string>();
-        if (y > 0) parts.Add(y == 1 ? "1 year" : $"{y} years");
-        if (m > 0 || y == 0) parts.Add(m == 1 ? "1 month" : $"{m} months");
-        return string.Join(", ", parts);
-    }
 }
 
 <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
@@ -79,7 +67,7 @@
                     <select class="form-select" id="strategy" name="strategy">
                         @foreach (var s in Enum.GetValues<PayoffStrategy>())
                         {
-                            <option value="@s" selected="@(s == Model.Settings.Strategy)">@Name(s)</option>
+                            <option value="@s" selected="@(s == Model.Settings.Strategy)">@s.DisplayName()</option>
                         }
                     </select>
                 </div>
@@ -120,8 +108,8 @@
                         <div class="text-muted small">Debt-free</div>
                         @if (plan.PaysOff)
                         {
-                            <div class="debt-free-date">@plan.DebtFreeDate!.Value.ToString("MMMM yyyy")</div>
-                            <div class="text-muted small">in @Span(plan.Months) paying @plan.MonthlyPayment.ToString("C") a month</div>
+                            <div class="debt-free-date">@plan.DebtFreeDate!.Value.MonthTitle()</div>
+                            <div class="text-muted small">in @Dates.YearsAndMonths(plan.Months) paying @plan.MonthlyPayment.ToString("C") a month</div>
                         }
                         else
                         {
@@ -140,7 +128,7 @@
                             @if (baseline.PaysOff)
                             {
                                 <div class="fs-5 fw-semibold text-success money">@((baseline.TotalInterest - plan.TotalInterest).ToString("C")) less interest</div>
-                                <div class="text-success small">@Span(Math.Max(0, baseline.Months - plan.Months)) sooner</div>
+                                <div class="text-success small">@Dates.YearsAndMonths(Math.Max(0, baseline.Months - plan.Months)) sooner</div>
                             }
                             else
                             {
@@ -181,7 +169,7 @@
                         }
                     </svg>
                     <figcaption class="small text-muted d-flex gap-3 justify-content-center">
-                        <span><span class="legend-line line-plan"></span> @Name(plan.Strategy)</span>
+                        <span><span class="legend-line line-plan"></span> @plan.Strategy.DisplayName()</span>
                         <span><span class="legend-line line-baseline"></span> Minimums only</span>
                     </figcaption>
                 </figure>
@@ -228,12 +216,12 @@
                 {
                     <tr class="@(c.Strategy == plan.Strategy ? "table-active" : "")">
                         <td>
-                            @Name(c.Strategy)
+                            @c.Strategy.DisplayName()
                             @if (c == best) { <span class="badge text-bg-success ms-1">least interest</span> }
                             @if (c.Strategy == plan.Strategy) { <span class="badge text-bg-primary ms-1">your plan</span> }
                         </td>
                         <td class="text-end">@(c.DebtFreeDate?.ToString("MMM yyyy") ?? "Never")</td>
-                        <td class="text-end">@(c.PaysOff ? Span(c.Months) : "50+ years")</td>
+                        <td class="text-end">@(c.PaysOff ? Dates.YearsAndMonths(c.Months) : "50+ years")</td>
                         <td class="text-end money">@c.TotalInterest.ToString("C")</td>
                     </tr>
                 }

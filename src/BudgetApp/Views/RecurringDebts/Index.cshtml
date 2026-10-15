@@ -45,7 +45,7 @@ else
                                     <div class="item-title">@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</div>
                                     <div class="item-meta">
                                         @d.Company
-                                        @if (d.DueDay is int due) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")Due on the @due@(due switch { 1 or 21 or 31 => "st", 2 or 22 => "nd", 3 or 23 => "rd", _ => "th" })</span> }
+                                        @if (d.DueDay is int due) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")Due on the @Dates.Ordinal(due)</span> }
                                     </div>
                                     @if (d.IsLoan)
                                     {

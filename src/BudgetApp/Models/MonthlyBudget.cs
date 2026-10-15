@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using BudgetApp.Helpers;
 
 namespace BudgetApp.Models;
 
@@ -20,5 +21,5 @@ public class MonthlyBudget
     public DateTime FirstDay => new(Year, Month, 1);
 
     [NotMapped]
-    public string Title => FirstDay.ToString("MMMM yyyy");
+    public string Title => FirstDay.MonthTitle();
 }

@@ -6,10 +6,10 @@
 }
 
 <div class="month-nav d-flex align-items-center gap-2 mb-3">
-    <a class="btn btn-light border icon-btn rounded-circle" title="@Model.Previous.ToString("MMMM yyyy")" aria-label="Previous month"
+    <a class="btn btn-light border icon-btn rounded-circle" title="@Model.Previous.MonthTitle()" aria-label="Previous month"
        href="@Url.RouteUrl("month", new { year = Model.Previous.Year, month = Model.Previous.Month })"><i class="bi bi-chevron-left"></i></a>
     <h1 class="mb-0 flex-grow-1 text-center">@Model.Title</h1>
-    <a class="btn btn-light border icon-btn rounded-circle" title="@Model.Next.ToString("MMMM yyyy")" aria-label="Next month"
+    <a class="btn btn-light border icon-btn rounded-circle" title="@Model.Next.MonthTitle()" aria-label="Next month"
        href="@Url.RouteUrl("month", new { year = Model.Next.Year, month = Model.Next.Month })"><i class="bi bi-chevron-right"></i></a>
 </div>
 
@@ -201,7 +201,7 @@
                                 data-due="@e.DueDay" data-category="@e.CategoryId" data-pay="@e.PayPeriodId" data-status="@e.Status">
                                 <td>
                                     @e.Title
-                                    @if (e.DueDay is int due) { <span class="text-muted small">(@due@(due switch { 1 or 21 or 31 => "st", 2 or 22 => "nd", 3 or 23 => "rd", _ => "th" }))</span> }
+                                    @if (e.DueDay is int due) { <span class="text-muted small">(@Dates.Ordinal(due))</span> }
                                     @if (e.RecurringDebtId is null) { <span class="badge text-bg-light border">extra</span> }
                                 </td>
                                 <td>@e.Company</td>
@@ -210,7 +210,7 @@
                                     <form asp-action="SetStatus" method="post">
                                         <input type="hidden" name="id" value="@e.Id" />
                                         <input type="hidden" name="status" value="@next" />
-                                        <button class="status-dot" title="@(e.Status == PaymentStatus.NotPaid ? "Not paid" : e.Status.ToString()) (click for @(next == PaymentStatus.NotPaid ? "Not paid" : next.ToString()))"
+                                        <button class="status-dot" title="@e.Status.DisplayName() (click for @next.DisplayName())"
                                                 aria-label="Change status"></button>
                                     </form>
                                 </td>

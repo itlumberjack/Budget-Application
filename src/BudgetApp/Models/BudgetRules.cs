@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace BudgetApp.Models;
 
 /// <summary>Household-wide rules for which month a paycheck is budgeted in. There is a single row.</summary>
-public class BudgetRules
+public class BudgetRules : ISingleRow
 {
     public int Id { get; set; }
 

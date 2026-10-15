@@ -1,3 +1,5 @@
+using BudgetApp.Helpers;
+
 namespace BudgetApp.Models;
 
 /// <summary>One payday on the month page, shown as a column like the budget spreadsheet.</summary>
@@ -17,18 +19,10 @@ public class PayColumn
     /// <summary>e.g. "October 9th" or "September 30th/October 2nd".</summary>
     public string Heading => IsUnassigned
         ? "Not assigned"
-        : string.Join("/", Paychecks.Select(p => p.PayDate.Date).Distinct().Select(d => d.ToString("MMMM ") + d.Day + DaySuffix(d.Day)));
+        : string.Join("/", Paychecks.Select(p => p.PayDate.Date).Distinct().Select(d => d.ToString("MMMM ") + Dates.Ordinal(d.Day)));
 
     public decimal Income => Paychecks.Sum(p => p.Total);
     public decimal Spending => Expenses.Sum(e => e.Amount);
     public decimal LeftOver => Income - Spending;
 
-    private static string DaySuffix(int day) => day switch
-    {
-        11 or 12 or 13 => "th",
-        _ when day % 10 == 1 => "st",
-        _ when day % 10 == 2 => "nd",
-        _ when day % 10 == 3 => "rd",
-        _ => "th"
-    };
 }

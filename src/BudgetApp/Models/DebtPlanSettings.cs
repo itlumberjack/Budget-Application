@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace BudgetApp.Models;
 
 /// <summary>How to pay debts off, from the Debt page. One row (Id = 1).</summary>
-public class DebtPlanSettings
+public class DebtPlanSettings : ISingleRow
 {
     public int Id { get; set; }
     public PayoffStrategy Strategy { get; set; } = PayoffStrategy.Avalanche;

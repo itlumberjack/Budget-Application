@@ -69,5 +69,5 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
 
     private async Task LoadCategoriesAsync() =>
         ViewBag.Categories = new SelectList(
-            await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(), "Id", "Name");
+            await db.Categories.InDisplayOrder().ToListAsync(), "Id", "Name");
 }

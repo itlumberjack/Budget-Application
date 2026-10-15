@@ -1,3 +1,4 @@
+using BudgetApp.Helpers;
 using BudgetApp.Models;
 
 namespace BudgetApp.Services;
@@ -19,7 +20,7 @@ public static class PaySchedule
     /// <summary>The first day of the month whose budget this payday belongs to.</summary>
     public static DateTime BudgetMonthFor(IncomeSource source, DateTime payday, BudgetRules? rules = null)
     {
-        var ownMonth = new DateTime(payday.Year, payday.Month, 1);
+        var ownMonth = payday.MonthStart();
         var nextMonth = ownMonth.AddMonths(1);
 
         if (source.CountsTowardNextMonth)

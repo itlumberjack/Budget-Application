@@ -15,6 +15,16 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
     public DbSet<PayPeriodExtra> PayPeriodExtras => Set<PayPeriodExtra>();
     public DbSet<BudgetExpense> BudgetExpenses => Set<BudgetExpense>();
 
+    /// <summary>The household's Brad's rule settings (a single row).</summary>
+    public Task<BudgetRules> GetRulesAsync() => SingleRowAsync(BudgetRules);
+
+    /// <summary>The Debt Payoff page's plan (a single row).</summary>
+    public Task<DebtPlanSettings> GetDebtPlanAsync() => SingleRowAsync(DebtPlanSettings);
+
+    /// <summary>Row 1 of a one-row settings table, added if it's missing.</summary>
+    private static async Task<T> SingleRowAsync<T>(DbSet<T> set) where T : class, ISingleRow, new() =>
+        await set.FindAsync(1) ?? set.Add(new T { Id = 1 }).Entity;
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<MonthlyBudget>().HasIndex(m => new { m.Year, m.Month }).IsUnique();
