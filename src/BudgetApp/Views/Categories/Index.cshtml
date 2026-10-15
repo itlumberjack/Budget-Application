@@ -3,34 +3,37 @@
     ViewData["Title"] = "Categories";
 }
 
-<h1>Categories</h1>
-<p class="text-muted">Each category is a section on the monthly budget page. Lower sort numbers show first.</p>
+<div class="mx-auto" style="max-width:44rem">
+    <h1 class="mb-1">Categories</h1>
+    <p class="page-subtitle">Each category is a section on the monthly budget page. Lower sort numbers show first.</p>
 
-<table class="table col-md-8">
-    <thead><tr><th>Name</th><th>Sort order</th><th></th></tr></thead>
-    <tbody>
-    @foreach (var c in Model)
-    {
-        var formId = $"cat-{c.Id}";
-        <tr>
-            <td><input form="@formId" name="Name" value="@c.Name" class="form-control form-control-sm" /></td>
-            <td><input form="@formId" name="SortOrder" type="number" value="@c.SortOrder" class="form-control form-control-sm day-input" /></td>
-            <td class="text-end text-nowrap">
-                <form id="@formId" asp-action="Save" method="post" class="d-inline">
-                    <input type="hidden" name="Id" value="@c.Id" />
-                    <button class="btn btn-sm btn-outline-primary">Save</button>
-                </form>
-                <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this category?');">
-                    <button class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-            </td>
-        </tr>
-    }
-    </tbody>
-</table>
+    <div class="card mb-3">
+        <div class="card-body">
+            <form asp-action="Save" method="post" class="d-flex gap-2">
+                <input name="Name" class="form-control" placeholder="New category, e.g. Medical" required />
+                <button class="btn btn-primary text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
+            </form>
+        </div>
+    </div>
 
-<h2 class="h5">Add a category</h2>
-<form asp-action="Save" method="post" class="d-flex gap-2 col-md-6">
-    <input name="Name" class="form-control" placeholder="e.g. Medical" required />
-    <button class="btn btn-primary">Add</button>
-</form>
+    <div class="card">
+        <div class="list-group list-group-flush">
+            @foreach (var c in Model)
+            {
+                var formId = $"cat-{c.Id}";
+                <div class="list-group-item d-flex align-items-center gap-2">
+                    <i class="bi bi-tag text-brand"></i>
+                    <input form="@formId" name="Name" value="@c.Name" class="form-control form-control-sm flex-grow-1" aria-label="Name" />
+                    <input form="@formId" name="SortOrder" type="number" value="@c.SortOrder" class="form-control form-control-sm" style="width:5rem" aria-label="Sort order" title="Sort order" />
+                    <form id="@formId" asp-action="Save" method="post">
+                        <input type="hidden" name="Id" value="@c.Id" />
+                        <button class="btn btn-sm btn-outline-primary icon-btn" title="Save" aria-label="Save"><i class="bi bi-check-lg"></i></button>
+                    </form>
+                    <form asp-action="Delete" asp-route-id="@c.Id" method="post" onsubmit="return confirm('Delete this category?');">
+                        <button class="btn btn-sm btn-outline-danger icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash3"></i></button>
+                    </form>
+                </div>
+            }
+        </div>
+    </div>
+</div>

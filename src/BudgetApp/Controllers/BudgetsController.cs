@@ -161,37 +161,48 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
     // ----- Expenses -----
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddExpense(int budgetId, int categoryId, string title, decimal amount, int? dueDay)
+    public async Task<IActionResult> AddExpense(int budgetId, int categoryId, int? payPeriodId, string title, string? company, decimal amount, int? dueDay,
+        PaymentStatus status = PaymentStatus.NotPaid)
     {
-        var budget = await db.MonthlyBudgets.FindAsync(budgetId);
+        var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
         if (budget is null) return NotFound();
         if (string.IsNullOrWhiteSpace(title))
         {
             TempData["Error"] = "Give the expense a name.";
-            return RedirectToMonth(budget.Year, budget.Month, $"cat-{categoryId}");
+            return RedirectToMonth(budget.Year, budget.Month);
         }
         db.BudgetExpenses.Add(new BudgetExpense
         {
             MonthlyBudgetId = budgetId,
             CategoryId = categoryId,
+            PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null,
             Title = title.Trim(),
+            Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim(),
             Amount = amount,
-            DueDay = dueDay is >= 1 and <= 31 ? dueDay : null
+            DueDay = dueDay is >= 1 and <= 31 ? dueDay : null,
+            Status = Enum.IsDefined(status) ? status : PaymentStatus.NotPaid
         });
         await db.SaveChangesAsync();
-        return RedirectToMonth(budget.Year, budget.Month, $"cat-{categoryId}");
+        return RedirectToMonth(budget.Year, budget.Month);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateExpense(int id, string title, decimal amount, int? dueDay)
+    public async Task<IActionResult> UpdateExpense(int id, string title, string? company, decimal amount, int? dueDay,
+        int categoryId, int? payPeriodId, PaymentStatus status)
     {
-        var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
+        var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).ThenInclude(b => b!.PayPeriods)
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
+        var budget = expense.MonthlyBudget!;
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
+        expense.Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim();
         expense.Amount = amount;
         expense.DueDay = dueDay is >= 1 and <= 31 ? dueDay : null;
+        if (await db.Categories.AnyAsync(c => c.Id == categoryId)) expense.CategoryId = categoryId;
+        expense.PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null;
+        if (Enum.IsDefined(status)) expense.Status = status;
         await db.SaveChangesAsync();
-        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month, $"cat-{expense.CategoryId}");
+        return RedirectToMonth(budget.Year, budget.Month);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -202,7 +213,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
         if (!Enum.IsDefined(status)) return BadRequest();
         expense.Status = status;
         await db.SaveChangesAsync();
-        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month, $"cat-{expense.CategoryId}");
+        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -212,7 +223,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder) : Cont
         if (expense is null) return NotFound();
         db.BudgetExpenses.Remove(expense);
         await db.SaveChangesAsync();
-        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month, $"cat-{expense.CategoryId}");
+        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month);
     }
 
     private RedirectResult RedirectToMonth(int year, int month, string? anchor = null) =>

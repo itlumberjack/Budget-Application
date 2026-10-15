@@ -3,56 +3,99 @@
     ViewData["Title"] = "Monthly Budgets";
     var today = DateTime.Today;
     var existing = Model.Select(m => (m.Year, m.Month)).ToHashSet();
+    var hasIncome = (bool)ViewBag.HasIncome;
+    var hasDebts = (bool)ViewBag.HasDebts;
 }
 
-<h1 class="mb-3">Monthly Budgets</h1>
-
-@if (!(bool)ViewBag.HasIncome || !(bool)ViewBag.HasDebts)
-{
-    <div class="alert alert-info">
-        <strong>Getting started:</strong>
-        <ol class="mb-0">
-            <li class="@((bool)ViewBag.HasIncome ? "text-decoration-line-through" : "")">Enter your take-home pay and pay schedules on <a asp-controller="Income" asp-action="Index">Pay &amp; Schedule</a>.</li>
-            <li class="@((bool)ViewBag.HasDebts ? "text-decoration-line-through" : "")">Add your monthly bills on <a asp-controller="RecurringDebts" asp-action="Index">Recurring Debts</a>.</li>
-            <li>Open a month below. It fills in automatically from your paychecks and bills.</li>
-        </ol>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">Monthly Budgets</h1>
+        <p class="page-subtitle mb-0">Pick a month to see every paycheck and bill side by side.</p>
     </div>
-}
-
-<div class="d-flex flex-wrap gap-2 mb-4">
-    @for (var i = 0; i < 4; i++)
-    {
-        var d = today.AddMonths(i);
-        <a class="btn @(existing.Contains((d.Year, d.Month)) ? "btn-primary" : "btn-outline-primary")"
-           href="@Url.RouteUrl("month", new { year = d.Year, month = d.Month })">@d.ToString("MMMM yyyy")</a>
-    }
-    <form asp-action="Go" method="get" class="d-flex gap-2 ms-auto">
+    <form asp-action="Go" method="get" class="d-flex gap-2">
         <input type="month" name="month" class="form-control" value="@today.ToString("yyyy-MM")" aria-label="Pick a month" />
-        <button class="btn btn-outline-secondary">Open</button>
+        <button class="btn btn-primary text-nowrap"><i class="bi bi-box-arrow-in-right"></i> Open</button>
     </form>
 </div>
 
+@if (!hasIncome || !hasDebts)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 mb-3"><i class="bi bi-stars text-brand me-1"></i> Let's get set up</h2>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <a asp-controller="Income" asp-action="Index" class="d-flex gap-3 text-decoration-none text-body">
+                        <span class="stat-icon icon-income flex-shrink-0"><i class="bi @(hasIncome ? "bi-check-lg" : "bi-1-circle")"></i></span>
+                        <span><span class="fw-semibold d-block @(hasIncome ? "text-decoration-line-through text-muted" : "")">Add your paychecks</span><span class="item-meta">Take-home pay and how often it comes.</span></span>
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <a asp-controller="RecurringDebts" asp-action="Index" class="d-flex gap-3 text-decoration-none text-body">
+                        <span class="stat-icon icon-spend flex-shrink-0"><i class="bi @(hasDebts ? "bi-check-lg" : "bi-2-circle")"></i></span>
+                        <span><span class="fw-semibold d-block @(hasDebts ? "text-decoration-line-through text-muted" : "")">Add your monthly bills</span><span class="item-meta">Mortgage, power, car payment and so on.</span></span>
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-3">
+                        <span class="stat-icon icon-left flex-shrink-0"><i class="bi bi-3-circle"></i></span>
+                        <span><span class="fw-semibold d-block">Open a month</span><span class="item-meta">It fills in from your paychecks and bills.</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<h2 class="h6 text-uppercase text-muted fw-semibold mb-2">Coming up</h2>
+<div class="row g-2 mb-4">
+    @for (var i = 0; i < 4; i++)
+    {
+        var d = today.AddMonths(i);
+        var made = existing.Contains((d.Year, d.Month));
+        <div class="col-6 col-md-3">
+            <a class="card month-card position-relative p-3 h-100 @(i == 0 ? "bg-brand-soft" : "")" href="@Url.RouteUrl("month", new { year = d.Year, month = d.Month })">
+                <div class="fw-semibold">@d.ToString("MMMM")</div>
+                <div class="item-meta">@d.Year &middot; @(made ? "Open budget" : "Not started")</div>
+                <i class="bi @(made ? "bi-arrow-right-circle-fill text-brand" : "bi-plus-circle text-muted") position-absolute top-0 end-0 m-3 fs-5"></i>
+            </a>
+        </div>
+    }
+</div>
+
+<h2 class="h6 text-uppercase text-muted fw-semibold mb-2">All months</h2>
 @if (Model.Count == 0)
 {
-    <p class="text-muted">No months yet. Pick one above to create it.</p>
+    <div class="card empty-state">
+        <i class="bi bi-calendar3"></i>
+        <p class="mt-2 mb-0 text-muted">No budgets yet. Pick a month above to start one.</p>
+    </div>
 }
 else
 {
-    <table class="table table-hover">
-        <thead>
-            <tr><th>Month</th><th class="text-end">Income</th><th class="text-end">Planned spending</th><th class="text-end">Complete</th><th class="text-end">Left over</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var m in Model)
-            {
-                <tr>
-                    <td><a href="@Url.RouteUrl("month", new { year = m.Year, month = m.Month })">@m.Title</a></td>
-                    <td class="text-end money">@m.Income.ToString("C")</td>
-                    <td class="text-end money">@m.Expenses.ToString("C")</td>
-                    <td class="text-end money">@m.Complete.ToString("C")</td>
-                    <td class="text-end money @(m.Remaining < 0 ? "text-danger fw-bold" : "text-success")">@m.Remaining.ToString("C")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="row g-3">
+        @foreach (var m in Model.OrderByDescending(m => m.Year).ThenByDescending(m => m.Month))
+        {
+            var pct = m.Expenses > 0 ? (int)(m.Complete / m.Expenses * 100) : 0;
+            <div class="col-sm-6 col-lg-4">
+                <a class="card month-card p-3 h-100" href="@Url.RouteUrl("month", new { year = m.Year, month = m.Month })">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="fw-semibold fs-5">@m.Title</div>
+                        <span class="badge rounded-pill @(m.Remaining < 0 ? "text-bg-danger" : "text-bg-success")">@(m.Remaining < 0 ? "Over" : "On track")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2 small">
+                        <span class="text-muted">Income</span><span class="money">@m.Income.ToString("C")</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">Planned</span><span class="money">@m.Expenses.ToString("C")</span>
+                    </div>
+                    <div class="d-flex justify-content-between small fw-semibold">
+                        <span>Left over</span><span class="money @(m.Remaining < 0 ? "text-danger" : "text-success")">@m.Remaining.ToString("C")</span>
+                    </div>
+                    <div class="progress mt-2" title="@pct% of bills complete"><div class="progress-bar" style="width:@pct%; background: var(--status-complete)"></div></div>
+                    <div class="item-meta mt-1">@pct% of bills complete</div>
+                </a>
+            </div>
+        }
+    </div>
 }

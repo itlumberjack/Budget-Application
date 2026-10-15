@@ -1,41 +1,153 @@
-html {
-  font-size: 14px;
+/* ---------- Theme ---------- */
+:root {
+  --brand: #1f6f6a;
+  --brand-dark: #165450;
+  --brand-soft: #e3f1ef;
+  --accent: #f4a261;
+  --page-bg: #f4f6f9;
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 12px rgba(16, 24, 40, .06);
+  --bs-body-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-body-bg: var(--page-bg);
+  --bs-link-color: var(--brand);
+  --bs-link-color-rgb: 31, 111, 106;
+  --bs-link-hover-color: var(--brand-dark);
+  --bs-border-radius: .6rem;
+  --bs-border-radius-lg: .9rem;
+  --status-complete: #3cb44b;
+  --status-pending: #ffe14d;
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
+html { font-size: 15px; }
+@media (min-width: 768px) { html { font-size: 16px; } }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
+body { background: var(--page-bg); padding-bottom: 5rem; }
+@media (min-width: 768px) { body { padding-bottom: 0; } }
 
-html {
-  position: relative;
-  min-height: 100%;
-}
+h1, .h1 { font-weight: 700; letter-spacing: -.02em; font-size: 1.75rem; }
+@media (min-width: 768px) { h1, .h1 { font-size: 2rem; } }
+.page-subtitle { color: var(--bs-secondary-color); margin-top: -.25rem; }
 
-body {
-  margin-bottom: 60px;
+.btn-primary {
+  --bs-btn-bg: var(--brand); --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand-dark); --bs-btn-hover-border-color: var(--brand-dark);
+  --bs-btn-active-bg: var(--brand-dark); --bs-btn-active-border-color: var(--brand-dark);
+  --bs-btn-disabled-bg: var(--brand); --bs-btn-disabled-border-color: var(--brand);
 }
+.btn-outline-primary {
+  --bs-btn-color: var(--brand); --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand); --bs-btn-hover-border-color: var(--brand);
+  --bs-btn-active-bg: var(--brand-dark); --bs-btn-active-border-color: var(--brand-dark);
+}
+.btn { border-radius: .6rem; font-weight: 500; }
+.text-brand { color: var(--brand) !important; }
+.bg-brand-soft { background: var(--brand-soft) !important; }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.form-control, .form-select { border-radius: .55rem; }
+.form-control:focus, .form-select:focus, .form-check-input:focus, .btn:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 .2rem rgba(31, 111, 106, .2);
 }
+.form-check-input:checked { background-color: var(--brand); border-color: var(--brand); }
+.form-label { font-weight: 500; font-size: .9rem; }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
-}
+.card { border: 0; border-radius: var(--bs-border-radius-lg); box-shadow: var(--card-shadow); }
+.card-header { background: transparent; border-bottom: 1px solid rgba(0,0,0,.06); font-weight: 600; }
+.alert { border: 0; border-radius: .75rem; box-shadow: var(--card-shadow); }
+.modal-content { border: 0; border-radius: 1rem; }
 .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.amount-input { max-width: 8.5rem; }
-.day-input { max-width: 4.5rem; }
-.summary-card .value { font-size: 1.5rem; font-weight: 600; }
-.status-select { width: 7.5rem; }
-.status-notpaid .status-select { border-color: var(--bs-border-color); }
-.status-pending .status-select { background-color: #fff3cd; border-color: #ffc107; }
-.status-complete .status-select { background-color: #d1e7dd; border-color: #198754; }
-.status-complete td.title input { text-decoration: line-through; color: var(--bs-secondary-color); }
-.table td, .table th { vertical-align: middle; }
+
+/* ---------- Header and navigation ---------- */
+.app-header { background: linear-gradient(135deg, var(--brand) 0%, #2a8c84 100%); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+.app-header .navbar { padding-top: .6rem; padding-bottom: .6rem; }
+.brand-mark { display: inline-grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: .6rem; background: rgba(255,255,255,.18); font-size: 1.15rem; }
+.app-header .nav-link { color: rgba(255,255,255,.85); font-weight: 500; }
+.app-header .nav-link:hover { color: #fff; background: rgba(255,255,255,.12); }
+.app-header .nav-link.active { color: var(--brand-dark); background: #fff; }
+
+.tab-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: #fff; border-top: 1px solid rgba(0,0,0,.08); box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-bar a { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .5rem 0 .45rem; color: #6b7280; text-decoration: none; font-size: .72rem; font-weight: 500; }
+.tab-bar a i { font-size: 1.3rem; }
+.tab-bar a.active { color: var(--brand); }
+
+/* ---------- Stat tiles ---------- */
+.stat { padding: 1rem 1.1rem; height: 100%; }
+.stat .label { font-size: .8rem; color: var(--bs-secondary-color); font-weight: 500; display: flex; align-items: center; gap: .4rem; }
+.stat .label i { font-size: 1rem; }
+.stat .value { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
+.stat .hint { font-size: .78rem; color: var(--bs-secondary-color); }
+.stat-icon { display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: .5rem; }
+.icon-income { background: #e3f1ef; color: var(--brand); }
+.icon-spend { background: #fdecef; color: #c2415d; }
+.icon-done { background: #e6f6e8; color: #2a8a37; }
+.icon-left { background: #fff4e5; color: #c2700f; }
+.progress { height: .45rem; border-radius: 1rem; background: #edf0f4; }
+.progress-bar.bg-brand { background: var(--brand); }
+
+/* ---------- Month list ---------- */
+.month-card { transition: transform .12s ease, box-shadow .12s ease; color: inherit; text-decoration: none; display: block; }
+.month-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,24,40,.1); color: inherit; }
+.month-chip { border-radius: 2rem; }
+
+/* ---------- Lists (pay, bills, categories) ---------- */
+.list-group-flush > .list-group-item { padding: .8rem 1rem; }
+.item-title { font-weight: 600; }
+.item-meta { font-size: .82rem; color: var(--bs-secondary-color); }
+.icon-btn { width: 2.25rem; height: 2.25rem; display: inline-grid; place-items: center; padding: 0; }
+.empty-state { text-align: center; padding: 2.5rem 1rem; }
+.empty-state i { font-size: 2.5rem; color: var(--brand); opacity: .7; }
+
+/* ---------- Month page: spreadsheet-style columns, one per payday ---------- */
+.sheet { overflow-x: auto; background: #fff; border-radius: var(--bs-border-radius-lg); box-shadow: var(--card-shadow); scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+.sheet-grid { display: grid; column-gap: 1.5rem; padding: 1rem 1.25rem 1.25rem; min-width: min-content; }
+.sheet-heading { scroll-snap-align: start; scroll-margin-left: 1rem; font-weight: 700; font-size: 1.1rem; text-align: center; padding: .4rem 0 .6rem; border-bottom: 3px solid var(--brand); color: var(--brand-dark); }
+.sheet-heading.text-muted { border-bottom-color: #cbd2d9; }
+.sheet-block { padding-top: 1.1rem; }
+.block-title { font-weight: 600; text-align: center; position: relative; padding-bottom: .15rem; }
+.block-title .block-add { position: absolute; right: 0; top: -.1rem; font-size: .78rem; text-decoration: none; font-weight: 600; color: var(--brand); padding: .1rem .5rem !important; border-radius: 1rem; background: var(--brand-soft); }
+.sheet-table { width: 100%; font-size: .875rem; border-collapse: collapse; }
+.sheet-table th { font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: #6b7280; border-bottom: 2px solid #d5dbe1; padding: 3px 6px; }
+.sheet-table td { padding: 4px 6px; border-bottom: 1px solid #eef1f4; }
+.sheet-table tfoot td { font-weight: 700; border-top: 2px solid #d5dbe1; border-bottom: 0; }
+.sheet-summary { padding-top: 1.5rem; }
+.sheet-summary .sheet-table { background: var(--brand-soft); border-radius: .6rem; overflow: hidden; }
+.sheet-summary .sheet-table td { border-color: rgba(31,111,106,.12); padding: 6px 10px; }
+.sheet-summary .sheet-table tfoot td { font-size: 1.05rem; border-top-color: rgba(31,111,106,.25); }
+.sheet-table tr.clickable { cursor: pointer; }
+.sheet-table tr.clickable:hover td { box-shadow: inset 0 0 0 9999px rgba(0,0,0,.035); }
+.sheet-table tr.status-complete td { background: var(--status-complete); color: #fff; }
+.sheet-table tr.status-complete .text-muted { color: rgba(255,255,255,.85) !important; }
+.sheet-table tr.status-pending td { background: var(--status-pending); }
+.status-cell { width: 2rem; text-align: center; }
+.status-cell form { margin: 0; }
+.status-dot { width: 1.1rem; height: 1.1rem; border-radius: 50%; border: 2px solid #9aa4ae; background: #fff; padding: 0; display: inline-block; vertical-align: middle; position: relative; }
+.status-dot::after { content: ""; position: absolute; inset: -.6rem; } /* bigger tap target */
+.status-pending .status-dot { background: #c99a00; border-color: #c99a00; }
+.status-complete .status-dot { background: #fff; border-color: #fff; box-shadow: inset 0 0 0 3px #1e7b2a; }
+.legend { display: inline-flex; align-items: center; gap: .35rem; }
+.legend .swatch { width: .9rem; height: .9rem; border-radius: .2rem; border: 1px solid #b8c0c8; display: inline-block; }
+.legend .swatch.status-complete { background: var(--status-complete); border-color: var(--status-complete); }
+.legend .swatch.status-pending { background: var(--status-pending); border-color: #e0c100; }
+.legend .swatch.status-notpaid { background: #fff; }
+.hide-empty .empty-cat { display: none; }
+
+/* Payday pills: jump between columns (most useful on a phone) */
+.payday-pills { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: none; }
+.payday-pills::-webkit-scrollbar { display: none; }
+.payday-pills .btn { white-space: nowrap; border-radius: 2rem; font-size: .85rem; }
+
+@media (max-width: 767.98px) {
+  /* One payday fills the screen; swipe sideways for the next. */
+  .sheet-grid { column-gap: 1rem; padding: .75rem; }
+  .sheet-table { font-size: .9rem; }
+  .sheet-table td { padding: 6px 6px; }
+  .month-nav h1 { font-size: 1.35rem; }
+}
+.sheet-grid { grid-template-columns: repeat(var(--cols), minmax(285px, 1fr)); }
+@media (max-width: 767.98px) {
+  .sheet-grid { grid-template-columns: repeat(var(--cols), calc(100vw - 3.5rem)); }
+}

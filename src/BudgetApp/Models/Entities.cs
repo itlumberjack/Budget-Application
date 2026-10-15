@@ -49,6 +49,13 @@ public class IncomeSource
     [Range(1, 31)]
     public int? DayOfMonth { get; set; }
 
+    /// <summary>
+    /// For end-of-month pay that covers the next month's bills: the Sept 30 paycheck
+    /// shows up in October's budget instead of September's.
+    /// </summary>
+    [Display(Name = "Budget this paycheck in the following month")]
+    public bool CountsTowardNextMonth { get; set; }
+
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 }
@@ -71,6 +78,10 @@ public class RecurringDebt
 
     [Required, StringLength(100)]
     public string Title { get; set; } = "";
+
+    /// <summary>Who gets paid, e.g. "Trustmark" or "State Farm".</summary>
+    [StringLength(100)]
+    public string? Company { get; set; }
 
     [Column(TypeName = "decimal(12,2)")]
     [Range(0, 10_000_000)]
@@ -158,8 +169,15 @@ public class BudgetExpense
     [Required, StringLength(100)]
     public string Title { get; set; } = "";
 
+    [StringLength(100)]
+    public string? Company { get; set; }
+
     [Column(TypeName = "decimal(12,2)")]
     public decimal Amount { get; set; }
+
+    /// <summary>The paycheck this comes out of. Each payday is a column on the month page.</summary>
+    public int? PayPeriodId { get; set; }
+    public PayPeriod? PayPeriod { get; set; }
 
     public int CategoryId { get; set; }
     public Category? Category { get; set; }

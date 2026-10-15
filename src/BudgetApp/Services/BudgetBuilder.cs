@@ -21,8 +21,9 @@ public class BudgetBuilder(BudgetDbContext db)
     }
 
     /// <summary>
-    /// Adds any paychecks and recurring debts that are missing from the month.
-    /// Never changes or removes lines that are already there, so manual adjustments are kept.
+    /// Adds any paychecks and recurring debts that are missing from the month, and puts any bill
+    /// that isn't under a payday yet into one. Never changes amounts or moves bills that already
+    /// have a payday, so manual adjustments are kept.
     /// </summary>
     public async Task<(int paychecks, int debts)> SyncAsync(int budgetId)
     {
@@ -34,7 +35,7 @@ public class BudgetBuilder(BudgetDbContext db)
         var addedPay = 0;
         foreach (var source in await db.IncomeSources.Where(s => s.IsActive).ToListAsync())
         {
-            foreach (var payday in PaySchedule.PaydaysInMonth(source, budget.Year, budget.Month))
+            foreach (var payday in PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month))
             {
                 if (budget.PayPeriods.Any(p => p.IncomeSourceId == source.Id && p.PayDate.Date == payday))
                     continue;
@@ -48,6 +49,8 @@ public class BudgetBuilder(BudgetDbContext db)
                 addedPay++;
             }
         }
+        // Paychecks need ids before bills can point at them.
+        await db.SaveChangesAsync();
 
         var addedDebts = 0;
         foreach (var debt in await db.RecurringDebts.Where(d => d.IsActive).ToListAsync())
@@ -58,6 +61,7 @@ public class BudgetBuilder(BudgetDbContext db)
             {
                 RecurringDebtId = debt.Id,
                 Title = debt.Title,
+                Company = debt.Company,
                 Amount = debt.Amount,
                 CategoryId = debt.CategoryId,
                 DueDay = debt.DueDay
@@ -65,7 +69,27 @@ public class BudgetBuilder(BudgetDbContext db)
             addedDebts++;
         }
 
+        foreach (var expense in budget.Expenses.Where(e => e.PayPeriodId is null))
+            expense.PayPeriodId = PickPayPeriod(budget.PayPeriods, budget.Year, budget.Month, expense.DueDay)?.Id;
+
         await db.SaveChangesAsync();
         return (addedPay, addedDebts);
+    }
+
+    /// <summary>
+    /// The paycheck a bill should come out of: the last payday on or before its due day,
+    /// or the month's first payday when it's due before any paycheck arrives (or has no due day).
+    /// </summary>
+    public static PayPeriod? PickPayPeriod(IEnumerable<PayPeriod> payPeriods, int year, int month, int? dueDay)
+    {
+        var ordered = payPeriods.OrderBy(p => p.PayDate).ThenBy(p => p.Id).ToList();
+        if (ordered.Count == 0) return null;
+        if (dueDay is int day)
+        {
+            var dueDate = new DateTime(year, month, Math.Min(day, DateTime.DaysInMonth(year, month)));
+            var before = ordered.LastOrDefault(p => p.PayDate.Date <= dueDate);
+            if (before is not null) return ordered.First(p => p.PayDate.Date == before.PayDate.Date);
+        }
+        return ordered[0];
     }
 }
