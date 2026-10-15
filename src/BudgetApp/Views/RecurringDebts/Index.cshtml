@@ -47,6 +47,10 @@ else
                                         @d.Company
                                         @if (d.DueDay is int due) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")Due on the @due@(due switch { 1 or 21 or 31 => "st", 2 or 22 => "nd", 3 or 23 => "rd", _ => "th" })</span> }
                                     </div>
+                                    @if (d.IsLoan)
+                                    {
+                                        <div class="item-meta"><i class="bi bi-bank"></i> @d.Balance!.Value.ToString("C0") owed@(d.InterestRate is decimal r ? $" at {r:0.###}%" : "")</div>
+                                    }
                                 </div>
                                 <div class="fw-semibold money">@d.Amount.ToString("C")</div>
                                 <i class="bi bi-chevron-right text-muted"></i>

@@ -60,6 +60,33 @@ public class IncomeSource
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>How to pay debts off, from the Debt page. One row (Id = 1).</summary>
+public class DebtPlanSettings
+{
+    public int Id { get; set; }
+    public PayoffStrategy Strategy { get; set; } = PayoffStrategy.Avalanche;
+
+    /// <summary>Paid toward debt each month on top of the minimum payments (the starting snowball).</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal ExtraMonthly { get; set; }
+
+    /// <summary>A one-time extra payment (a "snowflake"), such as a tax refund.</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal OneTimeAmount { get; set; }
+    public DateTime? OneTimeMonth { get; set; }
+}
+
+public enum PayoffStrategy
+{
+    [Display(Name = "Debt avalanche (highest interest first)")] Avalanche = 1,
+    [Display(Name = "Debt snowball (lowest balance first)")] Snowball = 2,
+    [Display(Name = "Highest balance first")] HighestBalance = 3,
+    [Display(Name = "Order entered")] OrderEntered = 4,
+    [Display(Name = "Custom priority (lowest number first)")] CustomLowestFirst = 5,
+    [Display(Name = "Custom priority (highest number first)")] CustomHighestFirst = 6,
+    [Display(Name = "No snowball (minimum payments only)")] MinimumOnly = 7
+}
+
 /// <summary>Household-wide rules for which month a paycheck is budgeted in. There is a single row.</summary>
 public class BudgetRules
 {
@@ -115,6 +142,31 @@ public class RecurringDebt
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
+
+    /// <summary>For a loan or card: what's still owed. Debts with a balance show on the Debt page.</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    [Range(0, 100_000_000)]
+    [DataType(DataType.Currency)]
+    [Display(Name = "Amount owed")]
+    public decimal? Balance { get; set; }
+
+    /// <summary>Yearly interest rate (APR) as a percent, e.g. 6.5.</summary>
+    [Column(TypeName = "decimal(6,3)")]
+    [Range(0, 100)]
+    [Display(Name = "Interest rate (APR %)")]
+    public decimal? InterestRate { get; set; }
+
+    /// <summary>Your own payoff order for the "Custom priority" strategy on the Debt page.</summary>
+    [Range(0, 999)]
+    [Display(Name = "Payoff priority")]
+    public int? PayoffPriority { get; set; }
+
+    /// <summary>When the amount owed was last entered.</summary>
+    [DataType(DataType.Date)]
+    public DateTime? BalanceAsOf { get; set; }
+
+    [NotMapped]
+    public bool IsLoan => Balance > 0;
 }
 
 /// <summary>The budget for one calendar month.</summary>

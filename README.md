@@ -50,6 +50,25 @@ arrow moves that payday into the previous month and the right arrow moves it int
 Bills it was covering move to the month's other paydays. A paycheck moved this way shows a
 ⇄ icon, and Brad's rule leaves it where you put it. Moving it back to its own month clears that.
 
+## Debt payoff
+
+Give a bill on **Recurring Debts** an amount owed and an interest rate (under *Loan or credit card
+details*) and it becomes a loan. Its monthly amount is used as the minimum payment. The **Debt Payoff**
+page then shows:
+
+- Totals: amount owed, minimum payments, average rate (weighted by balance) and this month's interest.
+- A payoff plan modeled on the Vertex42 debt reduction calculator. Pick a strategy (avalanche,
+  snowball, highest balance first, order entered, custom priority, or minimums only), an extra amount
+  each month and an optional one-time payment. It shows the debt-free date, the total interest, and how
+  much interest and time it saves compared with paying only the minimums.
+- A chart of the total owed over time, the payoff order with each debt's payoff month, all strategies
+  side by side, and a month-by-month schedule.
+- A quick form for updating balances from your statements.
+
+Each month, every debt is charged interest (balance × APR ÷ 12) and paid its minimum. The rest of the
+monthly payment (the snowball) goes to the first unpaid debt in the strategy's order. When a debt is
+paid off, its minimum is added to the snowball.
+
 ## AI helper (optional)
 
 The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and

@@ -1,3 +1,5 @@
+using BudgetApp.Services;
+
 namespace BudgetApp.Models;
 
 public record MonthSummary(int Year, int Month, decimal Income, decimal Expenses, decimal Complete)
@@ -84,4 +86,19 @@ public class MonthViewModel
     public decimal TotalWithStatus(PaymentStatus status) =>
         Budget?.Expenses.Where(e => e.Status == status).Sum(e => e.Amount) ?? 0;
     public decimal Remaining => TotalIncome - TotalExpenses;
+}
+
+public class DebtPageModel
+{
+    public List<RecurringDebt> Loans { get; init; } = new();
+    public DebtPlanSettings Settings { get; init; } = new();
+    public PayoffPlan? Plan { get; set; }
+    public PayoffPlan? MinimumOnly { get; set; }
+    public List<PayoffPlan> Comparison { get; set; } = new();
+
+    public decimal TotalOwed => Loans.Sum(l => l.Balance ?? 0);
+    public decimal TotalMinimum => Loans.Sum(l => l.Amount);
+    /// <summary>APR averaged by balance.</summary>
+    public decimal AverageRate => TotalOwed == 0 ? 0 : Loans.Sum(l => (l.Balance ?? 0) * (l.InterestRate ?? 0)) / TotalOwed;
+    public decimal MonthlyInterestNow => Loans.Sum(l => Math.Round((l.Balance ?? 0) * (l.InterestRate ?? 0) / 1200m, 2));
 }
