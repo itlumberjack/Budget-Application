@@ -123,7 +123,7 @@ public class BudgetBuilder(BudgetDbContext db)
         // Last month is included so its end-of-month paycheck can move into this month (and back again).
         foreach (var pay in paychecks.Where(p => p.MonthlyBudget!.FirstDay >= thisMonth.AddMonths(-1)).OrderBy(p => p.PayDate))
         {
-            if (!sources.TryGetValue(pay.IncomeSourceId!.Value, out var source)) continue;
+            if (pay.ManuallyMoved || !sources.TryGetValue(pay.IncomeSourceId!.Value, out var source)) continue;
             var belongs = PaySchedule.BudgetMonthFor(source, pay.PayDate, rules);
             var current = pay.MonthlyBudget!.FirstDay;
             if (belongs == current || (belongs < thisMonth && current < thisMonth)) continue;
@@ -144,12 +144,22 @@ public class BudgetBuilder(BudgetDbContext db)
         return moved;
     }
 
+    /// <summary>The month a paycheck goes in by its schedule and Brad's rule.</summary>
+    private async Task<DateTime> NaturalMonthAsync(PayPeriod pay)
+    {
+        var source = pay.IncomeSourceId is int id ? await db.IncomeSources.FindAsync(id) : null;
+        return source is null
+            ? new DateTime(pay.PayDate.Year, pay.PayDate.Month, 1)
+            : PaySchedule.BudgetMonthFor(source, pay.PayDate, await GetRulesAsync());
+    }
+
     /// <summary>
     /// Moves one paycheck into the month before or after, e.g. an October 31 check that pays November's bills.
     /// Bills it was covering in the old month go to that month's other paydays; in the new month it picks up
     /// the unpaid bills due before the next payday. Returns the month it landed in.
+    /// A move by hand (<paramref name="manual"/>) is remembered so Brad's rule won't undo it.
     /// </summary>
-    public async Task<MonthlyBudget> MovePaycheckAsync(int payPeriodId, int monthOffset)
+    public async Task<MonthlyBudget> MovePaycheckAsync(int payPeriodId, int monthOffset, bool manual = false)
     {
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstAsync(p => p.Id == payPeriodId);
         var from = pay.MonthlyBudget!;
@@ -163,6 +173,7 @@ public class BudgetBuilder(BudgetDbContext db)
             e.PayPeriodId = PickPayPeriod(remaining, oldMonth.Year, oldMonth.Month, e.DueDay)?.Id;
 
         pay.MonthlyBudgetId = to.Id;
+        pay.ManuallyMoved = manual && await NaturalMonthAsync(pay) != to.FirstDay;
         await db.SaveChangesAsync();
 
         // In the new month, unpaid bills that now fall to this paycheck move under it.

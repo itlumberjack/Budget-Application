@@ -252,6 +252,9 @@ namespace BudgetApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<bool>("ManuallyMoved")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("MonthlyBudgetId")
                         .HasColumnType("int");
 

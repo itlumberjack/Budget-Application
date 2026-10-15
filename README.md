@@ -43,6 +43,13 @@ Out of the box `appsettings.json` has `"Database": { "Provider": "InMemory" }`, 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Shifting the first or last payday
+
+On a month page, the first payday column has a left arrow and the last one has a right arrow. The left
+arrow moves that payday into the previous month and the right arrow moves it into the next month.
+Bills it was covering move to the month's other paydays. A paycheck moved this way shows a
+⇄ icon, and Brad's rule leaves it where you put it. Moving it back to its own month clears that.
+
 ## AI helper (optional)
 
 The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and

@@ -109,7 +109,26 @@
 
         @foreach (var col in columns)
         {
-            <div class="sheet-heading @(col.IsUnassigned ? "text-muted" : "")">@col.Heading</div>
+            var isFirst = col == payColumns.FirstOrDefault();
+            var isLast = col == payColumns.LastOrDefault();
+            var payIds = string.Join(",", col.Paychecks.Select(p => p.Id));
+            <div class="sheet-heading @(col.IsUnassigned ? "text-muted" : "")">
+                @if (isFirst)
+                {
+                    <form asp-action="ShiftPayday" method="post" class="shift-form shift-prev">
+                        <input type="hidden" name="budgetId" value="@b.Id" /><input type="hidden" name="payIds" value="@payIds" /><input type="hidden" name="offset" value="-1" />
+                        <button class="btn btn-sm shift-btn" title="Move this payday to @Model.Previous.ToString("MMMM")" aria-label="Move this payday to @Model.Previous.ToString("MMMM")"><i class="bi bi-arrow-left"></i></button>
+                    </form>
+                }
+                <span>@col.Heading</span>
+                @if (isLast)
+                {
+                    <form asp-action="ShiftPayday" method="post" class="shift-form shift-next">
+                        <input type="hidden" name="budgetId" value="@b.Id" /><input type="hidden" name="payIds" value="@payIds" /><input type="hidden" name="offset" value="1" />
+                        <button class="btn btn-sm shift-btn" title="Move this payday to @Model.Next.ToString("MMMM")" aria-label="Move this payday to @Model.Next.ToString("MMMM")"><i class="bi bi-arrow-right"></i></button>
+                    </form>
+                }
+            </div>
         }
 
         @* Income *@
@@ -131,7 +150,7 @@
                     {
                         <tr class="clickable" data-bs-toggle="modal" data-bs-target="#payModal"
                             data-id="@p.Id" data-label="@p.Label" data-amount="@p.BaseAmount.ToString("0.00")" data-date="@p.PayDate.ToString("yyyy-MM-dd")">
-                            <td>@p.Label <span class="text-muted small">(@p.PayDate.ToString("M/d"))</span></td>
+                            <td>@p.Label <span class="text-muted small">(@p.PayDate.ToString("M/d"))</span>@if (p.ManuallyMoved) {<i class="bi bi-arrow-left-right text-muted small ms-1" title="Moved here by hand. Brad's rule leaves it here."></i>}</td>
                             <td class="text-end money">@p.BaseAmount.ToString("C")</td>
                         </tr>
                         @foreach (var x in p.Extras)
