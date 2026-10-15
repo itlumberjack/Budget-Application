@@ -7,15 +7,6 @@ using BudgetApp.Models;
 
 namespace BudgetApp.Services;
 
-/// <summary>A bill the advisor suggests moving to another payday column.</summary>
-public record SuggestedMove(int ExpenseId, string Title, decimal Amount, int? DueDay,
-    string From, string To, int ToPayPeriodId, string Reason);
-
-/// <summary>Left over in one column before and after the suggested moves.</summary>
-public record ColumnOutcome(string Heading, decimal Before, decimal After);
-
-public record ArrangementSuggestion(string Summary, List<SuggestedMove> Moves, List<ColumnOutcome> Columns);
-
 /// <summary>
 /// Asks Claude how to spread a month's unpaid bills across its paydays so no paycheck runs short
 /// and bills are paid before they're due. It only suggests; nothing changes until the user applies it.
@@ -211,6 +202,3 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         return sb.ToString();
     }
 }
-
-/// <summary>A problem the user should see, worded for them.</summary>
-public class AdvisorException(string message) : Exception(message);

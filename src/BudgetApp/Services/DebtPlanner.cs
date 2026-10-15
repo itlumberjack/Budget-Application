@@ -2,23 +2,6 @@ using BudgetApp.Models;
 
 namespace BudgetApp.Services;
 
-/// <summary>One debt going into a payoff plan.</summary>
-public record DebtInput(int Id, string Name, decimal Balance, decimal Apr, decimal MinPayment, int? Priority);
-
-/// <summary>How one debt fares under a plan.</summary>
-public record DebtOutcome(DebtInput Debt, int Order, int? PayoffMonth, DateTime? PayoffDate, decimal InterestPaid);
-
-/// <summary>One month of a plan: what went to each debt (by Id) and what's left.</summary>
-public record ScheduleMonth(int Number, DateTime Month, Dictionary<int, decimal> Payments, Dictionary<int, decimal> Balances,
-    decimal Interest, decimal Snowball, decimal TotalBalance);
-
-public record PayoffPlan(PayoffStrategy Strategy, decimal MonthlyPayment, List<DebtOutcome> Debts, List<ScheduleMonth> Schedule,
-    decimal TotalInterest, decimal TotalPaid, bool PaysOff)
-{
-    public int Months => Schedule.Count;
-    public DateTime? DebtFreeDate => PaysOff && Schedule.Count > 0 ? Schedule[^1].Month : null;
-}
-
 /// <summary>
 /// Debt payoff math in the style of the Vertex42 debt reduction calculator. Each month every debt
 /// gets its interest (balance × APR ÷ 12) and its minimum payment. The rest of the monthly debt payment,
