@@ -13,6 +13,7 @@ A personal budget app built with ASP.NET Core MVC (.NET 10) and MySQL.
   - new paychecks and recurring debts are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
 
   New bills go under the last paycheck on or before their due day, or the month's first paycheck if they have no due day.
+- **Moving a paycheck to another month**: click a paycheck on the month page and choose **Move to November** (or back). Use it for a one-off, like an October 31 check that pays November's bills. The unpaid bills due before the next payday move under it, and the bills it covered in the old month go to that month's other paydays. For a paycheck that *always* covers the next month, use the option below instead.
 - **Pay & Schedule** has a "Budget this paycheck in the following month" option for end-of-month pay that covers next month's bills, so a Sept 30 paycheck appears in October.
 - **Categories**: the sections on the month page. Ten are created for you.
 

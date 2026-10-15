@@ -61,6 +61,9 @@ public class BudgetBuilder(BudgetDbContext db)
             {
                 if (budget.PayPeriods.Any(p => p.IncomeSourceId == source.Id && p.PayDate.Date == payday))
                     continue;
+                // Already budgeted in another month (moved there with "Move to next month").
+                if (await db.PayPeriods.AnyAsync(p => p.IncomeSourceId == source.Id && p.PayDate == payday))
+                    continue;
                 budget.PayPeriods.Add(new PayPeriod
                 {
                     IncomeSourceId = source.Id,
@@ -96,6 +99,39 @@ public class BudgetBuilder(BudgetDbContext db)
 
         await db.SaveChangesAsync();
         return (addedPay, addedDebts);
+    }
+
+    /// <summary>
+    /// Moves one paycheck into the month before or after, e.g. an October 31 check that pays November's bills.
+    /// Bills it was covering in the old month go to that month's other paydays; in the new month it picks up
+    /// the unpaid bills due before the next payday. Returns the month it landed in.
+    /// </summary>
+    public async Task<MonthlyBudget> MovePaycheckAsync(int payPeriodId, int monthOffset)
+    {
+        var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstAsync(p => p.Id == payPeriodId);
+        var from = pay.MonthlyBudget!;
+        var target = from.FirstDay.AddMonths(monthOffset);
+        var to = await CreateMonthAsync(target.Year, target.Month);
+
+        // Re-home the old month's bills that were under this paycheck.
+        var oldMonth = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstAsync(b => b.Id == from.Id);
+        var remaining = oldMonth.PayPeriods.Where(p => p.Id != pay.Id).ToList();
+        foreach (var e in oldMonth.Expenses.Where(e => e.PayPeriodId == pay.Id))
+            e.PayPeriodId = PickPayPeriod(remaining, oldMonth.Year, oldMonth.Month, e.DueDay)?.Id;
+
+        pay.MonthlyBudgetId = to.Id;
+        await db.SaveChangesAsync();
+
+        // In the new month, unpaid bills that now fall to this paycheck move under it.
+        var newMonth = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstAsync(b => b.Id == to.Id);
+        foreach (var e in newMonth.Expenses.Where(e => e.Status == PaymentStatus.NotPaid))
+        {
+            var pick = PickPayPeriod(newMonth.PayPeriods, newMonth.Year, newMonth.Month, e.DueDay);
+            if (pick is not null && pick.PayDate.Date == pay.PayDate.Date)
+                e.PayPeriodId = pay.Id;
+        }
+        await db.SaveChangesAsync();
+        return to;
     }
 
     /// <summary>
