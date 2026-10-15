@@ -1,42 +1,61 @@
 @model List<IncomeSource>
 @{
     ViewData["Title"] = "Pay & Schedule";
+    var today = DateTime.Today;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Pay &amp; Schedule</h1>
-    <a asp-action="Create" class="btn btn-primary">Add a paycheck</a>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">Pay &amp; Schedule</h1>
+        <p class="page-subtitle mb-0">Each person's take-home pay and when it arrives.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a paycheck</a>
 </div>
-<p class="text-muted">Enter each person's take-home pay and how often it comes. Every paycheck that lands inside a month is added to that month's budget, so a weekly paycheck shows up four or five times depending on the month.</p>
 
 @if (Model.Count == 0)
 {
-    <p>Nothing here yet. Start with <a asp-action="Create">Add a paycheck</a>.</p>
+    <div class="card empty-state">
+        <i class="bi bi-wallet2"></i>
+        <h2 class="h5 mt-2">No paychecks yet</h2>
+        <p class="text-muted">Add each paycheck once. Every month's budget picks them up automatically.</p>
+        <div><a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a paycheck</a></div>
+    </div>
 }
 else
 {
-    <table class="table">
-        <thead><tr><th>Name</th><th>Schedule</th><th class="text-end">Take-home per check</th><th>Next payday</th><th></th></tr></thead>
-        <tbody>
+    <div class="row g-3">
         @foreach (var s in Model)
         {
-            var today = DateTime.Today;
             var next = BudgetApp.Services.PaySchedule.PaydaysInMonth(s, today.Year, today.Month)
                 .Concat(BudgetApp.Services.PaySchedule.PaydaysInMonth(s, today.AddMonths(1).Year, today.AddMonths(1).Month))
                 .Where(d => d >= today).Cast<DateTime?>().FirstOrDefault();
-            <tr class="@(s.IsActive ? "" : "text-muted")">
-                <td>@s.Name @if (!s.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
-                <td>@Html.DisplayFor(_ => s.Frequency)@(s.Frequency == PayFrequency.Monthly ? (s.DayOfMonth is int d ? $" on day {d}" : " on the last day") : "")@(s.CountsTowardNextMonth ? ", budgeted in the following month" : "")</td>
-                <td class="text-end money">@s.TakeHomeAmount.ToString("C")</td>
-                <td>@next?.ToString("ddd, MMM d")</td>
-                <td class="text-end text-nowrap">
-                    <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
-                    <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this paycheck? Months already created keep their paychecks.');">
-                        <button class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
-                </td>
-            </tr>
+            <div class="col-md-6">
+                <div class="card h-100 @(s.IsActive ? "" : "opacity-75")">
+                    <div class="card-body d-flex gap-3">
+                        <span class="stat-icon icon-income flex-shrink-0" style="width:2.6rem;height:2.6rem"><i class="bi bi-person-fill fs-5"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="item-title fs-5">@s.Name @if (!s.IsActive) { <span class="badge text-bg-secondary align-middle">inactive</span> }</div>
+                                <div class="fs-5 fw-bold money">@s.TakeHomeAmount.ToString("C")</div>
+                            </div>
+                            <div class="item-meta">
+                                <i class="bi bi-calendar-event me-1"></i>@Html.DisplayFor(_ => s.Frequency)@(s.Frequency == PayFrequency.Monthly ? (s.DayOfMonth is int d ? $" on day {d}" : " on the last day") : "")
+                                @if (s.CountsTowardNextMonth) { <span class="badge bg-brand-soft text-brand ms-1">counts toward next month</span> }
+                            </div>
+                            @if (next is DateTime n)
+                            {
+                                <div class="item-meta"><i class="bi bi-arrow-right-short"></i>Next payday @n.ToString("dddd, MMM d")</div>
+                            }
+                            <div class="d-flex gap-2 mt-2">
+                                <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+                                <form asp-action="Delete" asp-route-id="@s.Id" method="post" onsubmit="return confirm('Delete this paycheck? Months already created keep their paychecks.');">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         }
-        </tbody>
-    </table>
+    </div>
 }

@@ -1,42 +1,60 @@
 @model List<RecurringDebt>
 @{
     ViewData["Title"] = "Recurring Debts";
+    var groups = Model.GroupBy(d => d.Category).ToList();
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Recurring Debts</h1>
-    <a asp-action="Create" class="btn btn-primary">Add a debt</a>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">Recurring Debts</h1>
+        <p class="page-subtitle mb-0">Bills that come every month. New months start with these; changing one here leaves months you've already made alone.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a bill</a>
 </div>
-<p class="text-muted">Bills that come every month. Each new month's budget starts with these. Changing one here does not change months you've already created, so you can adjust a single month without touching the rest.</p>
 
 @if (Model.Count == 0)
 {
-    <p>Nothing here yet. Start with <a asp-action="Create">Add a debt</a>.</p>
+    <div class="card empty-state">
+        <i class="bi bi-receipt"></i>
+        <h2 class="h5 mt-2">No bills yet</h2>
+        <p class="text-muted">Add things like your mortgage, power bill and car payment.</p>
+        <div><a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a bill</a></div>
+    </div>
 }
 else
 {
-    <table class="table">
-        <thead><tr><th>Title</th><th>Company</th><th>Category</th><th>Due day</th><th class="text-end">Amount</th><th></th></tr></thead>
-        <tbody>
-        @foreach (var d in Model)
+    <div class="card stat mb-3 d-flex flex-row align-items-center justify-content-between">
+        <div class="label mb-0"><span class="stat-icon icon-spend"><i class="bi bi-calendar2-check"></i></span> Every month (active bills)</div>
+        <div class="value money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</div>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var g in groups)
         {
-            <tr class="@(d.IsActive ? "" : "text-muted")">
-                <td>@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
-                <td>@d.Company</td>
-                <td>@d.Category?.Name</td>
-                <td>@d.DueDay</td>
-                <td class="text-end money">@d.Amount.ToString("C")</td>
-                <td class="text-end text-nowrap">
-                    <a asp-action="Edit" asp-route-id="@d.Id" class="btn btn-sm btn-outline-primary">Edit</a>
-                    <form asp-action="Delete" asp-route-id="@d.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this recurring debt? Months already created keep their copy.');">
-                        <button class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
-                </td>
-            </tr>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between">
+                        <span>@g.Key?.Name</span>
+                        <span class="money">@g.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var d in g)
+                        {
+                            <a asp-action="Edit" asp-route-id="@d.Id" class="list-group-item list-group-item-action d-flex align-items-center gap-3 @(d.IsActive ? "" : "opacity-50")">
+                                <div class="flex-grow-1">
+                                    <div class="item-title">@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</div>
+                                    <div class="item-meta">
+                                        @d.Company
+                                        @if (d.DueDay is int due) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")Due on the @due@(due switch { 1 or 21 or 31 => "st", 2 or 22 => "nd", 3 or 23 => "rd", _ => "th" })</span> }
+                                    </div>
+                                </div>
+                                <div class="fw-semibold money">@d.Amount.ToString("C")</div>
+                                <i class="bi bi-chevron-right text-muted"></i>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
         }
-        </tbody>
-        <tfoot>
-            <tr class="fw-bold"><td colspan="4">Total per month (active)</td><td class="text-end money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</td><td></td></tr>
-        </tfoot>
-    </table>
+    </div>
 }
