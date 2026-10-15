@@ -1,0 +1,42 @@
+@model List<IncomeSource>
+@{
+    ViewData["Title"] = "Pay & Schedule";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Pay &amp; Schedule</h1>
+    <a asp-action="Create" class="btn btn-primary">Add a paycheck</a>
+</div>
+<p class="text-muted">Enter each person's take-home pay and how often it comes. Every paycheck that lands inside a month is added to that month's budget, so a weekly paycheck shows up four or five times depending on the month.</p>
+
+@if (Model.Count == 0)
+{
+    <p>Nothing here yet. Start with <a asp-action="Create">Add a paycheck</a>.</p>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>Name</th><th>Schedule</th><th class="text-end">Take-home per check</th><th>Next payday</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var s in Model)
+        {
+            var today = DateTime.Today;
+            var next = BudgetApp.Services.PaySchedule.PaydaysInMonth(s, today.Year, today.Month)
+                .Concat(BudgetApp.Services.PaySchedule.PaydaysInMonth(s, today.AddMonths(1).Year, today.AddMonths(1).Month))
+                .Where(d => d >= today).Cast<DateTime?>().FirstOrDefault();
+            <tr class="@(s.IsActive ? "" : "text-muted")">
+                <td>@s.Name @if (!s.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
+                <td>@Html.DisplayFor(_ => s.Frequency)@(s.Frequency == PayFrequency.Monthly ? (s.DayOfMonth is int d ? $" on day {d}" : " on the last day") : "")</td>
+                <td class="text-end money">@s.TakeHomeAmount.ToString("C")</td>
+                <td>@next?.ToString("ddd, MMM d")</td>
+                <td class="text-end text-nowrap">
+                    <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this paycheck? Months already created keep their paychecks.');">
+                        <button class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

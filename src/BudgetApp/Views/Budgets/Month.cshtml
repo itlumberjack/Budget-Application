@@ -1,0 +1,195 @@
+@model MonthViewModel
+@{
+    ViewData["Title"] = Model.Title;
+    var b = Model.Budget;
+}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary" href="@Url.RouteUrl("month", new { year = Model.Previous.Year, month = Model.Previous.Month })">&larr; @Model.Previous.ToString("MMM")</a>
+    <h1 class="mb-0 flex-grow-1 text-center">@Model.Title</h1>
+    <a class="btn btn-outline-secondary" href="@Url.RouteUrl("month", new { year = Model.Next.Year, month = Model.Next.Month })">@Model.Next.ToString("MMM") &rarr;</a>
+</div>
+
+@if (b is null)
+{
+    <div class="text-center py-5">
+        <p class="lead">There is no budget for @Model.Title yet.</p>
+        <p class="text-muted">Creating it adds every paycheck that lands in @Model.FirstDay.ToString("MMMM") and all of your active recurring debts. You can adjust anything afterwards.</p>
+        <form asp-action="Create" method="post">
+            <input type="hidden" name="year" value="@Model.Year" />
+            <input type="hidden" name="month" value="@Model.Month" />
+            <button class="btn btn-primary btn-lg">Create @Model.Title budget</button>
+        </form>
+    </div>
+    return;
+}
+
+<!-- Totals -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="card summary-card"><div class="card-body"><div class="text-muted small">Income</div><div class="value money">@Model.TotalIncome.ToString("C")</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card summary-card"><div class="card-body"><div class="text-muted small">Planned spending</div><div class="value money">@Model.TotalExpenses.ToString("C")</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card summary-card"><div class="card-body"><div class="text-muted small">Complete (out of account)</div><div class="value money">@Model.TotalWithStatus(PaymentStatus.Complete).ToString("C")</div><div class="small text-muted">Pending <span class="money">@Model.TotalWithStatus(PaymentStatus.Pending).ToString("C")</span> &middot; Not paid <span class="money">@Model.TotalWithStatus(PaymentStatus.NotPaid).ToString("C")</span></div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card summary-card @(Model.Remaining < 0 ? "border-danger" : "border-success")"><div class="card-body"><div class="text-muted small">Left over</div><div class="value money @(Model.Remaining < 0 ? "text-danger" : "text-success")">@Model.Remaining.ToString("C")</div></div></div></div>
+</div>
+
+<div class="row g-4">
+    <!-- Paychecks -->
+    <div class="col-lg-5">
+        <h2 class="h4">Paychecks</h2>
+        @if (b.PayPeriods.Count == 0)
+        {
+            <p class="text-muted">No paychecks this month. Set up your pay on <a asp-controller="Income" asp-action="Index">Pay &amp; Schedule</a>, then use "Add missing items" below.</p>
+        }
+        @foreach (var p in b.PayPeriods)
+        {
+            <div class="card mb-3" id="pay-@p.Id">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><strong>@p.Label</strong> &middot; @p.PayDate.ToString("ddd, MMM d")</span>
+                    <span class="money fw-bold">@p.Total.ToString("C")</span>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdatePaycheck" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                        <input type="hidden" name="id" value="@p.Id" />
+                        <label class="small text-muted">Take-home</label>
+                        <input type="number" step="0.01" name="baseAmount" value="@p.BaseAmount.ToString("0.00")" class="form-control form-control-sm amount-input" />
+                        <input type="date" name="payDate" value="@p.PayDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm" style="max-width:10rem" />
+                        <button class="btn btn-sm btn-outline-primary">Save</button>
+                    </form>
+
+                    @if (p.Extras.Count > 0)
+                    {
+                        <table class="table table-sm mb-2">
+                            @foreach (var x in p.Extras)
+                            {
+                                <tr>
+                                    <td>+ @x.Description</td>
+                                    <td class="text-end money">@x.Amount.ToString("C")</td>
+                                    <td class="text-end" style="width:1%">
+                                        <form asp-action="DeletePayExtra" method="post">
+                                            <input type="hidden" name="id" value="@x.Id" />
+                                            <button class="btn btn-sm btn-link text-danger p-0" title="Remove">&times;</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </table>
+                    }
+
+                    <form asp-action="AddPayExtra" method="post" class="d-flex flex-wrap gap-2">
+                        <input type="hidden" name="payPeriodId" value="@p.Id" />
+                        <input name="description" placeholder="Extra money (bonus, overtime...)" class="form-control form-control-sm flex-grow-1" style="min-width:10rem" required />
+                        <input type="number" step="0.01" name="amount" placeholder="Amount" class="form-control form-control-sm amount-input" required />
+                        <button class="btn btn-sm btn-success">Add</button>
+                    </form>
+
+                    <form asp-action="DeletePaycheck" method="post" class="mt-2 text-end" onsubmit="return confirm('Remove this paycheck from @Model.Title?');">
+                        <input type="hidden" name="id" value="@p.Id" />
+                        <button class="btn btn-sm btn-link text-danger p-0">Remove paycheck</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        <details class="mb-3">
+            <summary class="text-primary" style="cursor:pointer">Add other income this month</summary>
+            <form asp-action="AddPaycheck" method="post" class="d-flex flex-wrap gap-2 mt-2">
+                <input type="hidden" name="budgetId" value="@b.Id" />
+                <input name="label" placeholder="Description" class="form-control form-control-sm flex-grow-1" style="min-width:10rem" required />
+                <input type="date" name="payDate" value="@Model.FirstDay.ToString("yyyy-MM-dd")" class="form-control form-control-sm" style="max-width:10rem" />
+                <input type="number" step="0.01" name="amount" placeholder="Amount" class="form-control form-control-sm amount-input" required />
+                <button class="btn btn-sm btn-success">Add</button>
+            </form>
+        </details>
+    </div>
+
+    <!-- Spending by category -->
+    <div class="col-lg-7">
+        <h2 class="h4">Spending</h2>
+        @foreach (var cat in Model.Categories)
+        {
+            var items = b.Expenses.Where(e => e.CategoryId == cat.Id).OrderBy(e => e.DueDay ?? 99).ThenBy(e => e.Title).ToList();
+            <div class="card mb-3" id="cat-@cat.Id">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>@cat.Name</strong>
+                    <span class="money fw-bold">@items.Sum(e => e.Amount).ToString("C")</span>
+                </div>
+                <div class="card-body p-2">
+                    @if (items.Count > 0)
+                    {
+                        <table class="table table-sm mb-2">
+                            <thead class="small text-muted"><tr><th style="width:1%">Status</th><th>Item</th><th>Due</th><th>Amount</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (var e in items)
+                            {
+                                var formId = $"exp-{e.Id}";
+                                <tr class="status-@e.Status.ToString().ToLower()">
+                                    <td>
+                                        <form asp-action="SetStatus" method="post">
+                                            <input type="hidden" name="id" value="@e.Id" />
+                                            <select name="status" class="form-select form-select-sm status-select" onchange="this.form.submit()" aria-label="Payment status">
+                                                @foreach (var st in Enum.GetValues<PaymentStatus>())
+                                                {
+                                                    <option value="@st" selected="@(st == e.Status)">@(st == PaymentStatus.NotPaid ? "Not paid" : st.ToString())</option>
+                                                }
+                                            </select>
+                                        </form>
+                                    </td>
+                                    <td class="title">
+                                        <input form="@formId" name="title" value="@e.Title" class="form-control form-control-sm" />
+                                        @if (e.RecurringDebtId is null)
+                                        {
+                                            <span class="badge text-bg-warning">extra this month</span>
+                                        }
+                                    </td>
+                                    <td><input form="@formId" type="number" min="1" max="31" name="dueDay" value="@e.DueDay" class="form-control form-control-sm day-input" /></td>
+                                    <td><input form="@formId" type="number" step="0.01" name="amount" value="@e.Amount.ToString("0.00")" class="form-control form-control-sm amount-input" /></td>
+                                    <td class="text-nowrap text-end">
+                                        <form id="@formId" asp-action="UpdateExpense" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@e.Id" />
+                                            <button class="btn btn-sm btn-outline-primary">Save</button>
+                                        </form>
+                                        <form asp-action="DeleteExpense" method="post" class="d-inline" onsubmit="return confirm('Remove this item from @Model.Title?');">
+                                            <input type="hidden" name="id" value="@e.Id" />
+                                            <button class="btn btn-sm btn-link text-danger" title="Remove">&times;</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                    <form asp-action="AddExpense" method="post" class="d-flex flex-wrap gap-2">
+                        <input type="hidden" name="budgetId" value="@b.Id" />
+                        <input type="hidden" name="categoryId" value="@cat.Id" />
+                        <input name="title" placeholder="Add an extra @cat.Name.ToLower() expense" class="form-control form-control-sm flex-grow-1" style="min-width:10rem" required />
+                        <input type="number" min="1" max="31" name="dueDay" placeholder="Due" class="form-control form-control-sm day-input" />
+                        <input type="number" step="0.01" name="amount" placeholder="Amount" class="form-control form-control-sm amount-input" required />
+                        <button class="btn btn-sm btn-success">Add</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<hr />
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <form asp-action="SaveNotes" method="post">
+            <input type="hidden" name="id" value="@b.Id" />
+            <label class="form-label" for="notes">Notes for @Model.Title</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3">@b.Notes</textarea>
+            <button class="btn btn-sm btn-outline-primary mt-2">Save notes</button>
+        </form>
+    </div>
+    <div class="col-md-4 d-flex flex-column gap-2 justify-content-end">
+        <form asp-action="Sync" method="post">
+            <input type="hidden" name="id" value="@b.Id" />
+            <button class="btn btn-outline-secondary w-100" title="Adds paychecks and recurring debts that are missing from this month. Lines already here are left alone.">Add missing items</button>
+        </form>
+        <form asp-action="Delete" method="post" onsubmit="return confirm('Delete the whole @Model.Title budget? This cannot be undone.');">
+            <input type="hidden" name="id" value="@b.Id" />
+            <button class="btn btn-outline-danger w-100">Delete this month</button>
+        </form>
+    </div>
+</div>

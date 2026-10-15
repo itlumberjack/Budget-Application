@@ -1,0 +1,36 @@
+@model List<Category>
+@{
+    ViewData["Title"] = "Categories";
+}
+
+<h1>Categories</h1>
+<p class="text-muted">Each category is a section on the monthly budget page. Lower sort numbers show first.</p>
+
+<table class="table col-md-8">
+    <thead><tr><th>Name</th><th>Sort order</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var c in Model)
+    {
+        var formId = $"cat-{c.Id}";
+        <tr>
+            <td><input form="@formId" name="Name" value="@c.Name" class="form-control form-control-sm" /></td>
+            <td><input form="@formId" name="SortOrder" type="number" value="@c.SortOrder" class="form-control form-control-sm day-input" /></td>
+            <td class="text-end text-nowrap">
+                <form id="@formId" asp-action="Save" method="post" class="d-inline">
+                    <input type="hidden" name="Id" value="@c.Id" />
+                    <button class="btn btn-sm btn-outline-primary">Save</button>
+                </form>
+                <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this category?');">
+                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<h2 class="h5">Add a category</h2>
+<form asp-action="Save" method="post" class="d-flex gap-2 col-md-6">
+    <input name="Name" class="form-control" placeholder="e.g. Medical" required />
+    <button class="btn btn-primary">Add</button>
+</form>

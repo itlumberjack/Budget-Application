@@ -1,0 +1,64 @@
+@model IncomeSource
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Add a paycheck" : $"Edit {Model.Name}";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<form asp-action="Save" method="post" class="col-md-6">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" placeholder="e.g. Brad's paycheck" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="TakeHomeAmount" class="form-label"></label>
+        <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input asp-for="TakeHomeAmount" class="form-control" step="0.01" type="number" />
+        </div>
+        <span asp-validation-for="TakeHomeAmount" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Frequency" class="form-label"></label>
+        <select asp-for="Frequency" asp-items="Html.GetEnumSelectList<PayFrequency>()" class="form-select" id="frequency"></select>
+    </div>
+    <div class="mb-3" id="anchor-group">
+        <label asp-for="AnchorDate" class="form-label"></label>
+        <input asp-for="AnchorDate" type="date" class="form-control" />
+        <div class="form-text">Any past or upcoming payday. The app counts forward and back from it.</div>
+        <span asp-validation-for="AnchorDate" class="text-danger"></span>
+    </div>
+    <div class="mb-3" id="day-group">
+        <label asp-for="DayOfMonth" class="form-label"></label>
+        <input asp-for="DayOfMonth" class="form-control" placeholder="Leave empty for the last day of the month" />
+        <span asp-validation-for="DayOfMonth" class="text-danger"></span>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label"></label>
+    </div>
+
+    <button class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Show only the fields that matter for the chosen schedule.
+        const freq = document.getElementById('frequency');
+        function toggle() {
+            const v = freq.value;
+            const needsAnchor = v === '1' || v === '2';
+            document.getElementById('anchor-group').style.display = needsAnchor ? '' : 'none';
+            document.getElementById('AnchorDate').required = needsAnchor;
+            document.getElementById('day-group').style.display = v === '4' ? '' : 'none';
+        }
+        freq.addEventListener('change', toggle);
+        toggle();
+    </script>
+}

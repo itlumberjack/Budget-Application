@@ -1,0 +1,44 @@
+@model RecurringDebt
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Add a recurring debt" : $"Edit {Model.Title}";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<form asp-action="Save" method="post" class="col-md-6">
+    <input type="hidden" asp-for="Id" />
+    <div class="mb-3">
+        <label asp-for="Title" class="form-label"></label>
+        <input asp-for="Title" class="form-control" placeholder="e.g. Power bill" />
+        <span asp-validation-for="Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Amount" class="form-label"></label>
+        <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input asp-for="Amount" class="form-control" step="0.01" type="number" />
+        </div>
+        <span asp-validation-for="Amount" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="CategoryId" class="form-label"></label>
+        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-select"></select>
+        <div class="form-text">Need a new one? Add it on <a asp-controller="Categories" asp-action="Index">Categories</a>.</div>
+    </div>
+    <div class="mb-3">
+        <label asp-for="DueDay" class="form-label"></label>
+        <input asp-for="DueDay" class="form-control" placeholder="Optional, 1 to 31" />
+        <span asp-validation-for="DueDay" class="text-danger"></span>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label"></label>
+    </div>
+
+    <button class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,41 @@
+@model List<RecurringDebt>
+@{
+    ViewData["Title"] = "Recurring Debts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Recurring Debts</h1>
+    <a asp-action="Create" class="btn btn-primary">Add a debt</a>
+</div>
+<p class="text-muted">Bills that come every month. Each new month's budget starts with these. Changing one here does not change months you've already created, so you can adjust a single month without touching the rest.</p>
+
+@if (Model.Count == 0)
+{
+    <p>Nothing here yet. Start with <a asp-action="Create">Add a debt</a>.</p>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>Title</th><th>Category</th><th>Due day</th><th class="text-end">Amount</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var d in Model)
+        {
+            <tr class="@(d.IsActive ? "" : "text-muted")">
+                <td>@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</td>
+                <td>@d.Category?.Name</td>
+                <td>@d.DueDay</td>
+                <td class="text-end money">@d.Amount.ToString("C")</td>
+                <td class="text-end text-nowrap">
+                    <a asp-action="Edit" asp-route-id="@d.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form asp-action="Delete" asp-route-id="@d.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this recurring debt? Months already created keep their copy.');">
+                        <button class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+            <tr class="fw-bold"><td colspan="3">Total per month (active)</td><td class="text-end money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</td><td></td></tr>
+        </tfoot>
+    </table>
+}

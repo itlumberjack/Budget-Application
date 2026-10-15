@@ -1,0 +1,41 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+  color: var(--bs-secondary-color);
+  text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+  text-align: start;
+}
+.money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.amount-input { max-width: 8.5rem; }
+.day-input { max-width: 4.5rem; }
+.summary-card .value { font-size: 1.5rem; font-weight: 600; }
+.status-select { width: 7.5rem; }
+.status-notpaid .status-select { border-color: var(--bs-border-color); }
+.status-pending .status-select { background-color: #fff3cd; border-color: #ffc107; }
+.status-complete .status-select { background-color: #d1e7dd; border-color: #198754; }
+.status-complete td.title input { text-decoration: line-through; color: var(--bs-secondary-color); }
+.table td, .table th { vertical-align: middle; }
