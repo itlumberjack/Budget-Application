@@ -50,6 +50,11 @@
         <div class="form-text">Any date it's due, like this Friday. Each month gets a copy for every week (or every other week) from then on.</div>
         <span asp-validation-for="StartDate" class="text-danger"></span>
     </div>
+    <div class="form-check form-switch mb-3">
+        <input asp-for="IsFixed" class="form-check-input" role="switch" />
+        <label asp-for="IsFixed" class="form-check-label"></label>
+        <div class="form-text">Turn on for things that have to come out of their own payday, like weekly groceries. Even out and the AI helper only move bills that are off (flexible).</div>
+    </div>
     <details class="loan-details mb-3" @(Model.Balance is not null ? "open" : "")>
         <summary class="fw-semibold"><i class="bi bi-bank me-1"></i> Loan or credit card details</summary>
         <p class="form-text mt-2">Fill these in for anything with a balance, and it shows up on the <a asp-controller="Debt" asp-action="Index">Debt</a> page with payoff plans.</p>
@@ -109,6 +114,11 @@
             document.getElementById('StartDate').required = !monthly;
         };
         billFrequency.addEventListener('change', showSchedule);
+        // Weekly bills are usually tied to their payday, so a new one starts out fixed until you change it.
+        const isFixed = document.getElementById('IsFixed');
+        let fixedTouched = @(Model.Id != 0 ? "true" : "false");
+        isFixed.addEventListener('change', () => fixedTouched = true);
+        billFrequency.addEventListener('change', () => { if (!fixedTouched) isFixed.checked = billFrequency.value !== '0'; });
         showSchedule();
     </script>
 }

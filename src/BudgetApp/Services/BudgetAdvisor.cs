@@ -27,7 +27,9 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         3. Money left over is spread reasonably evenly, so no single paycheck is stretched thin.
         4. As few bills as possible move. If the month already works, suggest no moves.
 
-        Only move bills whose status is NotPaid. Never move a bill to the column it's already in.
+        Only move bills whose status is NotPaid and that are marked flexible; fixed bills stay where they are.
+        Never move a bill to a column whose first payday is after the bill's due day (the first column is the
+        exception, for bills due before any payday). Never move a bill to the column it's already in.
         Give each move a short, plain reason (one sentence, no jargon) that mentions the due day or the
         shortfall it fixes. The summary is one or two friendly sentences about how the month looks.
         """;
@@ -148,7 +150,8 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
             if (m?["bill_id"]?.GetValueKind() != JsonValueKind.Number || m["to_column"]?.GetValueKind() != JsonValueKind.Number) continue;
             var expense = expenses.FirstOrDefault(e => e.Id == (int)m["bill_id"]!);
             var to = (int)m["to_column"]! - 1;
-            if (expense is null || expense.Status != PaymentStatus.NotPaid || to < 0 || to >= columns.Count || !seen.Add(expense.Id)) continue;
+            if (expense is null || expense.Status != PaymentStatus.NotPaid || expense.IsFixed || to < 0 || to >= columns.Count
+                || !month.CanMoveTo(columns[to], expense) || !seen.Add(expense.Id)) continue;
             var from = columns.FirstOrDefault(c => c.Expenses.Contains(expense));
             if (from == columns[to]) continue;
             moves.Add(new SuggestedMove(expense.Id, expense.Title, expense.Amount, expense.DueDay,
@@ -182,13 +185,13 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
                           $"spending {c.Spending.ToString("C", us)}; left over {c.LeftOver.ToString("C", us)}.");
         }
         sb.AppendLine();
-        sb.AppendLine("Bills (id | title | category | amount | due day | status | current column):");
+        sb.AppendLine("Bills (id | title | category | amount | due day | status | fixed or flexible | current column):");
         foreach (var e in month.Budget!.Expenses.OrderBy(e => e.DueDay ?? 32).ThenBy(e => e.Title))
         {
             var col = columns.FindIndex(c => c.Expenses.Contains(e));
             var category = month.Categories.FirstOrDefault(c => c.Id == e.CategoryId)?.Name ?? "Other";
             sb.AppendLine($"{e.Id} | {e.Title} | {category} | {e.Amount.ToString("C", us)} | " +
-                          $"{(e.DueDay is int d ? "day " + d : "no due day")} | {e.Status} | " +
+                          $"{(e.DueDay is int d ? "day " + d : "no due day")} | {e.Status} | {(e.IsFixed ? "fixed" : "flexible")} | " +
                           $"{(col >= 0 ? "column " + (col + 1) : "not assigned")}");
         }
         return sb.ToString();

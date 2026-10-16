@@ -20,28 +20,40 @@ public class MonthViewModel
     /// (Brad's Sept 30 check and Jessica's Oct 2 check) share a column. A "Not assigned" column is
     /// added when a bill has no paycheck.
     /// </summary>
-    public List<PayColumn> Columns
-    {
-        get
-        {
-            if (Budget is null) return new();
-            var columns = new List<PayColumn>();
-            foreach (var pay in Budget.PayPeriods.OrderBy(p => p.PayDate).ThenBy(p => p.Label))
-            {
-                var current = columns.LastOrDefault();
-                if (current is null || (pay.PayDate.Date - current.Paychecks[^1].PayDate.Date).TotalDays > PayColumn.MergeWithinDays)
-                    columns.Add(current = new PayColumn());
-                current.Paychecks.Add(pay);
-            }
-            foreach (var column in columns)
-                column.Expenses.AddRange(Budget.Expenses.Where(e => column.Paychecks.Any(p => p.Id == e.PayPeriodId)));
+    public List<PayColumn> Columns => _columns ??= BuildColumns();
+    private List<PayColumn>? _columns;
 
-            var unassigned = Budget.Expenses.Where(e => e.PayPeriodId is null).ToList();
-            if (unassigned.Count > 0 || columns.Count == 0)
-                columns.Add(new PayColumn { Expenses = unassigned });
-            return columns;
+    private List<PayColumn> BuildColumns()
+    {
+        if (Budget is null) return new();
+        var columns = new List<PayColumn>();
+        foreach (var pay in Budget.PayPeriods.OrderBy(p => p.PayDate).ThenBy(p => p.Label))
+        {
+            var current = columns.LastOrDefault();
+            if (current is null || (pay.PayDate.Date - current.Paychecks[^1].PayDate.Date).TotalDays > PayColumn.MergeWithinDays)
+                columns.Add(current = new PayColumn());
+            current.Paychecks.Add(pay);
         }
+        foreach (var column in columns)
+            column.Expenses.AddRange(Budget.Expenses.Where(e => column.Paychecks.Any(p => p.Id == e.PayPeriodId)));
+
+        var unassigned = Budget.Expenses.Where(e => e.PayPeriodId is null).ToList();
+        if (unassigned.Count > 0 || columns.Count == 0)
+            columns.Add(new PayColumn { Expenses = unassigned });
+        return columns;
     }
+
+    /// <summary>The bill comes out of a payday on or before its due day (or it has no due day).</summary>
+    public bool PaysOnTime(PayColumn column, BudgetExpense bill) =>
+        column.IsUnassigned || bill.DueDay is not int day
+        || column.Paychecks.Min(p => p.PayDate.Date) <= new DateTime(Year, Month, Math.Min(day, DateTime.DaysInMonth(Year, Month)));
+
+    /// <summary>
+    /// Where Even out and the AI helper may put a bill: a payday on or before its due day, or the month's first
+    /// payday when it's due before any paycheck arrives.
+    /// </summary>
+    public bool CanMoveTo(PayColumn column, BudgetExpense bill) =>
+        !column.IsUnassigned && (PaysOnTime(column, bill) || column == Columns.FirstOrDefault(c => !c.IsUnassigned));
 
     public decimal TotalIncome => Budget?.PayPeriods.Sum(p => p.Total) ?? 0;
     public decimal TotalExpenses => Budget?.Expenses.Sum(e => e.Amount) ?? 0;

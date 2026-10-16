@@ -38,6 +38,13 @@ public class RecurringDebt
     [DataType(DataType.Date)]
     public DateTime? StartDate { get; set; }
 
+    /// <summary>
+    /// A fixed bill stays on the payday it falls under (weekly groceries, say). Even out and the AI helper
+    /// only move flexible bills.
+    /// </summary>
+    [Display(Name = "Fixed to its payday")]
+    public bool IsFixed { get; set; }
+
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 

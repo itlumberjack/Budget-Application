@@ -34,7 +34,9 @@ using (var scope = app.Services.CreateScope())
     else db.Migrate();
     app.Logger.LogInformation("Using {Provider} database", useInMemory ? "in-memory" : "MySQL");
     // Archive months that have ended and build the next six months' budgets.
-    await scope.ServiceProvider.GetRequiredService<BudgetBuilder>().KeepMonthsCurrentAsync();
+    var monthBuilder = scope.ServiceProvider.GetRequiredService<BudgetBuilder>();
+    await monthBuilder.RemoveDuplicateBillsAsync();
+    await monthBuilder.KeepMonthsCurrentAsync();
 }
 
 if (!app.Environment.IsDevelopment())

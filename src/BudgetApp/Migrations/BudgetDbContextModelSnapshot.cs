@@ -38,6 +38,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsFixed")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("MonthlyBudgetId")
                         .HasColumnType("int");
 
@@ -401,6 +404,9 @@ namespace BudgetApp.Migrations
                         .HasColumnType("decimal(6,3)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsFixed")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<int?>("PayoffPriority")

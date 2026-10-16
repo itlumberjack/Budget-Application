@@ -60,6 +60,18 @@ Data entered in testing mode does not carry over to MySQL.
   becomes read-only. Open it and choose **Unarchive to make changes** to edit it again; it then stays open
   until you click **Archive this month**.
 
+## Fixed and flexible bills
+
+Each bill on Recurring Debts has a **Fixed to its payday** switch. Fixed bills (weekly groceries, say)
+stay on the payday they fall under; Even out and the AI helper only ever move flexible ones. Weekly and
+every-two-weeks bills start out fixed, monthly bills start out flexible, and a single month's copy can be
+switched in its edit dialog. On the month page fixed bills show a pin, and a warning triangle marks any
+bill whose payday comes after its due date (for example a bill due the 1st when the first paycheck is the 2nd;
+Brad's rule can fix that by moving the end-of-month paycheck forward).
+
+Even out and the AI helper never move a bill to a payday after its due date. A monthly bill is added to a
+month once; only bills you add on the month page can repeat.
+
 ## Settings: buffer and leftover split
 
 The gear button at the top opens **Settings**. Each payday's left over is shared in two steps: a buffer
