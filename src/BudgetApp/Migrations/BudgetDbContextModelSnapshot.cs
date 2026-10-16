@@ -177,6 +177,38 @@ namespace BudgetApp.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.DebtPlanSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ExtraMonthly")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("OneTimeAmount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("OneTimeMonth")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Strategy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DebtPlanSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ExtraMonthly = 0m,
+                            OneTimeAmount = 0m,
+                            Strategy = 1
+                        });
+                });
+
             modelBuilder.Entity("BudgetApp.Models.IncomeSource", b =>
                 {
                     b.Property<int>("Id")
@@ -303,6 +335,12 @@ namespace BudgetApp.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(12,2)");
 
+                    b.Property<decimal?>("Balance")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("BalanceAsOf")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
@@ -313,8 +351,14 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("InterestRate")
+                        .HasColumnType("decimal(6,3)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<int?>("PayoffPriority")
+                        .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()

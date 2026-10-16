@@ -1,0 +1,37 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace BudgetApp.Models;
+
+/// <summary>A bill or spending line inside a month. Copied from a recurring debt, or added just for this month.</summary>
+public class BudgetExpense
+{
+    public int Id { get; set; }
+    public int MonthlyBudgetId { get; set; }
+    public MonthlyBudget? MonthlyBudget { get; set; }
+
+    [Required, StringLength(100)]
+    public string Title { get; set; } = "";
+
+    [StringLength(100)]
+    public string? Company { get; set; }
+
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal Amount { get; set; }
+
+    /// <summary>The paycheck this comes out of. Each payday is a column on the month page.</summary>
+    public int? PayPeriodId { get; set; }
+    public PayPeriod? PayPeriod { get; set; }
+
+    public int CategoryId { get; set; }
+    public Category? Category { get; set; }
+
+    [Range(1, 31)]
+    public int? DueDay { get; set; }
+
+    /// <summary>Set when this line came from a recurring debt.</summary>
+    public int? RecurringDebtId { get; set; }
+    public RecurringDebt? RecurringDebt { get; set; }
+
+    public PaymentStatus Status { get; set; } = PaymentStatus.NotPaid;
+}

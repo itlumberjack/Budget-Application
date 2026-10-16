@@ -38,6 +38,8 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             return View("Edit", debt);
         }
         var isNew = debt.Id == 0;
+        var oldBalance = isNew ? null : await db.RecurringDebts.Where(d => d.Id == debt.Id).Select(d => d.Balance).FirstOrDefaultAsync();
+        if (debt.Balance != oldBalance) debt.BalanceAsOf = debt.Balance is null ? null : DateTime.Today;
         if (isNew) db.RecurringDebts.Add(debt);
         else db.RecurringDebts.Update(debt);
         await db.SaveChangesAsync();
@@ -67,5 +69,5 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
 
     private async Task LoadCategoriesAsync() =>
         ViewBag.Categories = new SelectList(
-            await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(), "Id", "Name");
+            await db.Categories.InDisplayOrder().ToListAsync(), "Id", "Name");
 }

@@ -8,7 +8,7 @@ namespace BudgetApp.Controllers;
 public class CategoriesController(BudgetDbContext db) : Controller
 {
     public async Task<IActionResult> Index() =>
-        View(await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync());
+        View(await db.Categories.InDisplayOrder().ToListAsync());
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(Category category)

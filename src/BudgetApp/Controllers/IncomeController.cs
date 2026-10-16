@@ -11,7 +11,7 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder) : Contr
 {
     public async Task<IActionResult> Index()
     {
-        ViewBag.Rules = await builder.GetRulesAsync();
+        ViewBag.Rules = await db.GetRulesAsync();
         return View(await db.IncomeSources.OrderBy(s => s.Name).ToListAsync());
     }
 
@@ -19,8 +19,7 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder) : Contr
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveRules(bool endOfMonthPayGoesToNextMonth, bool weeklyClosestToFirstStartsMonth)
     {
-        var rules = await db.BudgetRules.FirstOrDefaultAsync();
-        if (rules is null) db.BudgetRules.Add(rules = new BudgetRules { Id = 1 });
+        var rules = await db.GetRulesAsync();
         rules.EndOfMonthPayGoesToNextMonth = endOfMonthPayGoesToNextMonth;
         rules.WeeklyClosestToFirstStartsMonth = weeklyClosestToFirstStartsMonth;
         await db.SaveChangesAsync();

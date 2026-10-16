@@ -1,0 +1,290 @@
+@model DebtPageModel
+@{
+    ViewData["Title"] = "Debt Payoff";
+    var plan = Model.Plan;
+    var baseline = Model.MinimumOnly;
+}
+
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">Debt Payoff</h1>
+        <p class="page-subtitle mb-0">Your loans and cards, and how fast different payoff plans clear them.</p>
+    </div>
+    <a asp-controller="RecurringDebts" asp-action="Create" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i> Add a loan</a>
+</div>
+
+@if (Model.Loans.Count == 0)
+{
+    <div class="card empty-state mx-auto" style="max-width:36rem">
+        <i class="bi bi-graph-down-arrow"></i>
+        <h2 class="h5 mt-2">No loans yet</h2>
+        <p class="text-muted">Open a bill on <a asp-controller="RecurringDebts" asp-action="Index">Recurring Debts</a> (your car payment, a credit card, a student loan), and fill in <strong>Loan or credit card details</strong> with the amount owed and the interest rate. Its monthly amount is used as the minimum payment.</p>
+        <div><a asp-controller="RecurringDebts" asp-action="Index" class="btn btn-primary">Go to Recurring Debts</a></div>
+    </div>
+    return;
+}
+
+<!-- Statistics -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+        <div class="card stat">
+            <div class="label"><span class="stat-icon icon-spend"><i class="bi bi-bank"></i></span> Total owed</div>
+            <div class="value money mt-1">@Model.TotalOwed.ToString("C")</div>
+            <div class="hint">@Model.Loans.Count @(Model.Loans.Count == 1 ? "debt" : "debts")</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat">
+            <div class="label"><span class="stat-icon icon-income"><i class="bi bi-calendar2-check"></i></span> Minimum payments</div>
+            <div class="value money mt-1">@Model.TotalMinimum.ToString("C")</div>
+            <div class="hint">every month</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat">
+            <div class="label"><span class="stat-icon icon-left"><i class="bi bi-percent"></i></span> Average rate</div>
+            <div class="value mt-1">@Model.AverageRate.ToString("0.##")%</div>
+            <div class="hint">weighted by balance</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat">
+            <div class="label"><span class="stat-icon icon-done"><i class="bi bi-hourglass-split"></i></span> Interest this month</div>
+            <div class="value money mt-1 text-danger">@Model.MonthlyInterestNow.ToString("C")</div>
+            <div class="hint">at today's balances</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <!-- Plan settings -->
+    <div class="col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h5"><i class="bi bi-sliders me-1"></i> Your plan</h2>
+            <form asp-action="SavePlan" method="post" id="planForm">
+                <div class="mb-3">
+                    <label class="form-label" for="strategy">Strategy</label>
+                    <select class="form-select" id="strategy" name="strategy">
+                        @foreach (var s in Enum.GetValues<PayoffStrategy>())
+                        {
+                            <option value="@s" selected="@(s == Model.Settings.Strategy)">@s.DisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="extraMonthly">Extra each month</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control" id="extraMonthly" name="extraMonthly" type="number" step="0.01" min="0" inputmode="decimal" value="@Model.Settings.ExtraMonthly.ToString("0.##")" />
+                    </div>
+                    <div class="form-text">On top of the minimums. This is the starting snowball; each paid-off debt's minimum is added to it.</div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label" for="oneTimeAmount">One-time extra</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control" id="oneTimeAmount" name="oneTimeAmount" type="number" step="0.01" min="0" inputmode="decimal" value="@(Model.Settings.OneTimeAmount > 0 ? Model.Settings.OneTimeAmount.ToString("0.##") : "")" placeholder="0" />
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label" for="oneTimeMonth">In</label>
+                        <input class="form-control" id="oneTimeMonth" name="oneTimeMonth" type="month" value="@Model.Settings.OneTimeMonth?.ToString("yyyy-MM")" />
+                    </div>
+                    <div class="form-text">Like a tax refund or a bonus.</div>
+                </div>
+                <div class="d-grid"><button class="btn btn-primary">Update plan</button></div>
+            </form>
+        </div></div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-lg-8">
+        <div class="card h-100"><div class="card-body">
+            @if (plan is not null && baseline is not null)
+            {
+                <div class="d-flex flex-wrap gap-4 align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small">Debt-free</div>
+                        @if (plan.PaysOff)
+                        {
+                            <div class="debt-free-date">@plan.DebtFreeDate!.Value.MonthTitle()</div>
+                            <div class="text-muted small">in @Dates.YearsAndMonths(plan.Months) paying @plan.MonthlyPayment.ToString("C") a month</div>
+                        }
+                        else
+                        {
+                            <div class="debt-free-date text-danger">Not in 50 years</div>
+                            <div class="text-muted small">A minimum payment doesn't cover its interest. Add an extra amount each month.</div>
+                        }
+                    </div>
+                    <div>
+                        <div class="text-muted small">Total interest</div>
+                        <div class="fs-4 fw-semibold money">@plan.TotalInterest.ToString("C")</div>
+                    </div>
+                    @if (plan.Strategy != PayoffStrategy.MinimumOnly && plan.PaysOff)
+                    {
+                        <div>
+                            <div class="text-muted small">Compared with minimums only</div>
+                            @if (baseline.PaysOff)
+                            {
+                                <div class="fs-5 fw-semibold text-success money">@((baseline.TotalInterest - plan.TotalInterest).ToString("C")) less interest</div>
+                                <div class="text-success small">@Dates.YearsAndMonths(Math.Max(0, baseline.Months - plan.Months)) sooner</div>
+                            }
+                            else
+                            {
+                                <div class="fs-5 fw-semibold text-success">Minimums alone never pay it off</div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @* Total balance over time: this plan against minimum payments only. *@
+                var series = new List<(string Css, string Label, List<decimal> Points)>
+                    {
+                        ("line-baseline", "Minimums only", new[] { Model.TotalOwed }.Concat(baseline.Schedule.Select(s => s.TotalBalance)).ToList()),
+                        ("line-plan", "Your plan", new[] { Model.TotalOwed }.Concat(plan.Schedule.Select(s => s.TotalBalance)).ToList())
+                    };
+                    var maxMonths = Math.Max(1, series.Max(x => x.Points.Count - 1));
+                    var maxBal = Math.Max(1m, series.Max(x => x.Points.Max()));
+                    const double W = 600, H = 220, L = 56, B = 24, T = 8, R = 24;
+                    string Pt(int i, decimal v) => $"{L + (W - L - R) * i / maxMonths:0.#},{T + (H - T - B) * (1 - (double)(v / maxBal)):0.#}";
+                var ticks = Math.Min(maxMonths, 5);
+                var startMonth = plan.Schedule.Count > 0 ? plan.Schedule[0].Month.AddMonths(-1) : DateTime.Today;
+                <figure class="mb-0">
+                    <svg viewBox="0 0 @W @H" class="debt-chart" role="img" aria-label="Total owed over time">
+                        @for (var g = 0; g <= 4; g++)
+                        {
+                            var y = T + (H - T - B) * g / 4.0;
+                            <line x1="@L" x2="@(W - R)" y1="@y.ToString("0.#")" y2="@y.ToString("0.#")" class="grid" />
+                            @:<text x="@(L - 6)" y="@((y + 4).ToString("0.#"))" text-anchor="end">@((maxBal * (4 - g) / 4).ToString("C0"))</text>
+                        }
+                        @for (var t = 0; t <= ticks; t++)
+                        {
+                            var i = maxMonths * t / ticks;
+                            @:<text x="@((L + (W - L - R) * i / maxMonths).ToString("0.#"))" y="@(H - 6)" text-anchor="middle">@startMonth.AddMonths(i).ToString("MMM yy")</text>
+                        }
+                        @foreach (var sr in series)
+                        {
+                            <polyline class="@sr.Css" points="@string.Join(" ", sr.Points.Select((v, i) => Pt(i, v)))" />
+                        }
+                    </svg>
+                    <figcaption class="small text-muted d-flex gap-3 justify-content-center">
+                        <span><span class="legend-line line-plan"></span> @plan.Strategy.DisplayName()</span>
+                        <span><span class="legend-line line-baseline"></span> Minimums only</span>
+                    </figcaption>
+                </figure>
+            }
+        </div></div>
+    </div>
+</div>
+
+@if (plan is not null)
+{
+    <!-- Payoff order -->
+    <div class="card mb-3">
+        <div class="card-header">Payoff order</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>#</th><th>Debt</th><th class="text-end">Owed</th><th class="text-end">Rate</th><th class="text-end">Minimum</th><th class="text-end">Paid off</th><th class="text-end">Interest</th></tr></thead>
+                <tbody>
+                @foreach (var o in plan.Debts)
+                {
+                    <tr>
+                        <td>@o.Order</td>
+                        <td class="fw-semibold">@o.Debt.Name</td>
+                        <td class="text-end money">@o.Debt.Balance.ToString("C")</td>
+                        <td class="text-end">@o.Debt.Apr.ToString("0.###")%</td>
+                        <td class="text-end money">@o.Debt.MinPayment.ToString("C")</td>
+                        <td class="text-end">@(o.PayoffDate?.ToString("MMM yyyy") ?? "Never")</td>
+                        <td class="text-end money">@o.InterestPaid.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Strategy comparison -->
+    var best = Model.Comparison.Where(c => c.PaysOff).OrderBy(c => c.TotalInterest).ThenBy(c => c.Months).FirstOrDefault();
+    <div class="card mb-3">
+        <div class="card-header">Compare strategies <span class="text-muted small">(same monthly payment)</span></div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Strategy</th><th class="text-end">Debt-free</th><th class="text-end">Time</th><th class="text-end">Total interest</th></tr></thead>
+                <tbody>
+                @foreach (var c in Model.Comparison)
+                {
+                    <tr class="@(c.Strategy == plan.Strategy ? "table-active" : "")">
+                        <td>
+                            @c.Strategy.DisplayName()
+                            @if (c == best) { <span class="badge text-bg-success ms-1">least interest</span> }
+                            @if (c.Strategy == plan.Strategy) { <span class="badge text-bg-primary ms-1">your plan</span> }
+                        </td>
+                        <td class="text-end">@(c.DebtFreeDate?.ToString("MMM yyyy") ?? "Never")</td>
+                        <td class="text-end">@(c.PaysOff ? Dates.YearsAndMonths(c.Months) : "50+ years")</td>
+                        <td class="text-end money">@c.TotalInterest.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Month-by-month schedule -->
+    <details class="card mb-3 schedule">
+        <summary class="card-header">Month-by-month schedule</summary>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        @foreach (var o in plan.Debts) { <th class="text-end">@o.Debt.Name</th> }
+                        <th class="text-end">Snowball</th>
+                        <th class="text-end">Interest</th>
+                        <th class="text-end">Still owed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var m in plan.Schedule)
+                {
+                    <tr>
+                        <td class="text-nowrap">@m.Month.ToString("MMM yyyy")</td>
+                        @foreach (var o in plan.Debts)
+                        {
+                            var paid = m.Payments.GetValueOrDefault(o.Debt.Id);
+                            <td class="text-end money @(paid == 0 ? "text-muted" : "")">
+                                @(paid == 0 ? "–" : paid.ToString("C"))
+                                @if (paid > 0 && m.Balances[o.Debt.Id] == 0) { <i class="bi bi-check-circle-fill text-success" title="Paid off"></i> }
+                            </td>
+                        }
+                        <td class="text-end money">@m.Snowball.ToString("C")</td>
+                        <td class="text-end money text-muted">@m.Interest.ToString("C")</td>
+                        <td class="text-end money fw-semibold">@m.TotalBalance.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </details>
+}
+
+<!-- Quick balance update -->
+<div class="card mb-3"><div class="card-body">
+    <h2 class="h5"><i class="bi bi-pencil-square me-1"></i> Update amounts owed</h2>
+    <p class="text-muted small">Check your statements now and then and put in the new balances, so the plan stays accurate.</p>
+    <form asp-action="UpdateBalances" method="post">
+        <div class="row g-2">
+            @foreach (var l in Model.Loans)
+            {
+                <div class="col-sm-6 col-lg-4">
+                    <label class="form-label small mb-1" for="bal-@l.Id">@l.Title <span class="text-muted">@(l.BalanceAsOf is DateTime d ? $"· as of {d:MMM d}" : "")</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control" id="bal-@l.Id" name="balances[@l.Id]" type="number" step="0.01" min="0" inputmode="decimal" value="@l.Balance!.Value.ToString("0.00")" />
+                    </div>
+                </div>
+            }
+        </div>
+        <button class="btn btn-outline-primary mt-3">Save amounts owed</button>
+    </form>
+</div></div>

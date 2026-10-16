@@ -1,4 +1,5 @@
 using BudgetApp.Data;
+using BudgetApp.Helpers;
 using BudgetApp.Models;
 using BudgetApp.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -37,25 +38,16 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         if (month is < 1 or > 12 || year is < 2000 or > 2100) return NotFound();
 
-        var budget = await db.MonthlyBudgets
-            .Include(b => b.PayPeriods).ThenInclude(p => p.Extras)
-            .Include(b => b.Expenses)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
+        var budget = await db.MonthlyBudgets.WithDetails().FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
 
         // Build the month on first visit from the pay schedules and recurring debts,
         // as long as there's something set up to build it from.
         if (budget is null && (await db.IncomeSources.AnyAsync(s => s.IsActive) || await db.RecurringDebts.AnyAsync(d => d.IsActive)))
         {
-            await builder.CreateMonthAsync(year, month);
-            budget = await db.MonthlyBudgets
-                .Include(b => b.PayPeriods).ThenInclude(p => p.Extras)
-                .Include(b => b.Expenses)
-                .AsSplitQuery()
-                .FirstAsync(b => b.Year == year && b.Month == month);
+            var created = await builder.CreateMonthAsync(year, month);
+            budget = await db.MonthlyBudgets.WithDetails().FirstAsync(b => b.Id == created.Id);
         }
 
-        ViewBag.AdvisorReady = advisor.IsConfigured;
         return View(await MonthModelAsync(year, month, budget));
     }
 
@@ -67,7 +59,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             Year = year,
             Month = month,
             Budget = budget,
-            Categories = await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync()
+            Categories = await db.Categories.InDisplayOrder().ToListAsync()
         };
     }
 
@@ -75,11 +67,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> SuggestArrangement(int id, CancellationToken ct)
     {
-        var budget = await db.MonthlyBudgets
-            .Include(b => b.PayPeriods).ThenInclude(p => p.Extras)
-            .Include(b => b.Expenses)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(b => b.Id == id, ct);
+        var budget = await db.MonthlyBudgets.WithDetails().FirstOrDefaultAsync(b => b.Id == id, ct);
         if (budget is null) return NotFound();
         try
         {
@@ -109,14 +97,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         }
         await db.SaveChangesAsync();
         TempData["Message"] = moved == 1 ? "Moved 1 bill." : $"Moved {moved} bills.";
-        return RedirectToMonth(budget.Year, budget.Month);
-    }
-
-    [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(int year, int month)
-    {
-        await builder.CreateMonthAsync(year, month);
-        return RedirectToMonth(year, month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -128,7 +109,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         TempData["Message"] = pay + debts == 0
             ? "Nothing new to add. This month already has every paycheck and recurring debt."
             : $"Added {pay} paycheck(s) and {debts} recurring debt(s).";
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -149,7 +130,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (budget is null) return NotFound();
         budget.Notes = notes;
         await db.SaveChangesAsync();
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     // ----- Paychecks -----
@@ -159,10 +140,9 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.FindAsync(budgetId);
         if (budget is null) return NotFound();
-        if (string.IsNullOrWhiteSpace(label)) label = "Other income";
-        db.PayPeriods.Add(new PayPeriod { MonthlyBudgetId = budgetId, Label = label.Trim(), PayDate = payDate, BaseAmount = amount });
+        db.PayPeriods.Add(new PayPeriod { MonthlyBudgetId = budgetId, Label = label.TrimToNull() ?? "Other income", PayDate = payDate, BaseAmount = amount });
         await db.SaveChangesAsync();
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -173,7 +153,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         pay.BaseAmount = baseAmount;
         pay.PayDate = payDate;
         await db.SaveChangesAsync();
-        return RedirectToMonth(pay.MonthlyBudget!.Year, pay.MonthlyBudget.Month, $"pay-{id}");
+        return RedirectToMonth(pay.MonthlyBudget!, $"pay-{id}");
     }
 
     /// <summary>Moves a paycheck to the next (offset 1) or previous (offset -1) month's budget.</summary>
@@ -183,10 +163,9 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (offset is not (1 or -1)) return BadRequest();
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
-        var from = pay.MonthlyBudget!;
         var to = await builder.MovePaycheckAsync(id, offset, manual: true);
         TempData["Message"] = $"Moved {pay.Label}'s {pay.PayDate:MMMM d} paycheck to {to.Title}. You're looking at {to.Title} now.";
-        return RedirectToMonth(to.Year, to.Month);
+        return RedirectToMonth(to);
     }
 
     /// <summary>
@@ -201,7 +180,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (budget is null) return NotFound();
         var ids = payIds.Split(',').Select(x => int.TryParse(x, out var n) ? n : 0).ToHashSet();
         var pays = budget.PayPeriods.Where(p => ids.Contains(p.Id)).OrderBy(p => p.PayDate).ToList();
-        if (pays.Count == 0) return RedirectToMonth(budget.Year, budget.Month);
+        if (pays.Count == 0) return RedirectToMonth(budget);
 
         MonthlyBudget? to = null;
         foreach (var pay in pays)
@@ -209,7 +188,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         var what = string.Join(" and ", pays.Select(p => $"{p.Label}'s {p.PayDate:MMMM d}"));
         TempData["Message"] = $"Moved {what} {(pays.Count == 1 ? "paycheck" : "paychecks")} to {to!.Title}. " +
                                $"Bills {(pays.Count == 1 ? "it was" : "they were")} covering here moved to the other paydays, and Brad's rule won't move {(pays.Count == 1 ? "it" : "them")} back.";
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -219,7 +198,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (pay is null) return NotFound();
         db.PayPeriods.Remove(pay);
         await db.SaveChangesAsync();
-        return RedirectToMonth(pay.MonthlyBudget!.Year, pay.MonthlyBudget.Month);
+        return RedirectToMonth(pay.MonthlyBudget!);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -232,12 +211,12 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             db.PayPeriodExtras.Add(new PayPeriodExtra
             {
                 PayPeriodId = payPeriodId,
-                Description = string.IsNullOrWhiteSpace(description) ? "Extra" : description.Trim(),
+                Description = description.TrimToNull() ?? "Extra",
                 Amount = amount
             });
             await db.SaveChangesAsync();
         }
-        return RedirectToMonth(pay.MonthlyBudget!.Year, pay.MonthlyBudget.Month, $"pay-{payPeriodId}");
+        return RedirectToMonth(pay.MonthlyBudget!, $"pay-{payPeriodId}");
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -248,8 +227,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (extra is null) return NotFound();
         db.PayPeriodExtras.Remove(extra);
         await db.SaveChangesAsync();
-        var b = extra.PayPeriod!.MonthlyBudget!;
-        return RedirectToMonth(b.Year, b.Month, $"pay-{extra.PayPeriodId}");
+        return RedirectToMonth(extra.PayPeriod!.MonthlyBudget!, $"pay-{extra.PayPeriodId}");
     }
 
     // ----- Expenses -----
@@ -263,7 +241,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (string.IsNullOrWhiteSpace(title))
         {
             TempData["Error"] = "Give the expense a name.";
-            return RedirectToMonth(budget.Year, budget.Month);
+            return RedirectToMonth(budget);
         }
         db.BudgetExpenses.Add(new BudgetExpense
         {
@@ -271,13 +249,13 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             CategoryId = categoryId,
             PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null,
             Title = title.Trim(),
-            Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim(),
+            Company = company.TrimToNull(),
             Amount = amount,
-            DueDay = dueDay is >= 1 and <= 31 ? dueDay : null,
+            DueDay = dueDay.ValidDay(),
             Status = Enum.IsDefined(status) ? status : PaymentStatus.NotPaid
         });
         await db.SaveChangesAsync();
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -289,14 +267,14 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (expense is null) return NotFound();
         var budget = expense.MonthlyBudget!;
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
-        expense.Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim();
+        expense.Company = company.TrimToNull();
         expense.Amount = amount;
-        expense.DueDay = dueDay is >= 1 and <= 31 ? dueDay : null;
+        expense.DueDay = dueDay.ValidDay();
         if (await db.Categories.AnyAsync(c => c.Id == categoryId)) expense.CategoryId = categoryId;
         expense.PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null;
         if (Enum.IsDefined(status)) expense.Status = status;
         await db.SaveChangesAsync();
-        return RedirectToMonth(budget.Year, budget.Month);
+        return RedirectToMonth(budget);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -307,7 +285,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (!Enum.IsDefined(status)) return BadRequest();
         expense.Status = status;
         await db.SaveChangesAsync();
-        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month);
+        return RedirectToMonth(expense.MonthlyBudget!);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -317,9 +295,12 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (expense is null) return NotFound();
         db.BudgetExpenses.Remove(expense);
         await db.SaveChangesAsync();
-        return RedirectToMonth(expense.MonthlyBudget!.Year, expense.MonthlyBudget.Month);
+        return RedirectToMonth(expense.MonthlyBudget!);
     }
 
     private RedirectResult RedirectToMonth(int year, int month, string? anchor = null) =>
         Redirect(Url.RouteUrl("month", new { year, month }) + (anchor is null ? "" : "#" + anchor));
+
+    private RedirectResult RedirectToMonth(MonthlyBudget budget, string? anchor = null) =>
+        RedirectToMonth(budget.Year, budget.Month, anchor);
 }
