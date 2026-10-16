@@ -184,9 +184,32 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
         var from = pay.MonthlyBudget!;
-        var to = await builder.MovePaycheckAsync(id, offset);
+        var to = await builder.MovePaycheckAsync(id, offset, manual: true);
         TempData["Message"] = $"Moved {pay.Label}'s {pay.PayDate:MMMM d} paycheck to {to.Title}. You're looking at {to.Title} now.";
         return RedirectToMonth(to.Year, to.Month);
+    }
+
+    /// <summary>
+    /// Shifts a whole payday column (the first one back a month, the last one forward), keeping the page
+    /// on this month. Brad's rule leaves shifted paychecks alone.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ShiftPayday(int budgetId, string payIds, int offset)
+    {
+        if (offset is not (1 or -1)) return BadRequest();
+        var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
+        if (budget is null) return NotFound();
+        var ids = payIds.Split(',').Select(x => int.TryParse(x, out var n) ? n : 0).ToHashSet();
+        var pays = budget.PayPeriods.Where(p => ids.Contains(p.Id)).OrderBy(p => p.PayDate).ToList();
+        if (pays.Count == 0) return RedirectToMonth(budget.Year, budget.Month);
+
+        MonthlyBudget? to = null;
+        foreach (var pay in pays)
+            to = await builder.MovePaycheckAsync(pay.Id, offset, manual: true);
+        var what = string.Join(" and ", pays.Select(p => $"{p.Label}'s {p.PayDate:MMMM d}"));
+        TempData["Message"] = $"Moved {what} {(pays.Count == 1 ? "paycheck" : "paychecks")} to {to!.Title}. " +
+                               $"Bills {(pays.Count == 1 ? "it was" : "they were")} covering here moved to the other paydays, and Brad's rule won't move {(pays.Count == 1 ? "it" : "them")} back.";
+        return RedirectToMonth(budget.Year, budget.Month);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
