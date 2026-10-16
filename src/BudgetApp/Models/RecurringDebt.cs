@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using BudgetApp.Helpers;
 
 namespace BudgetApp.Models;
 
-/// <summary>A bill that repeats every month (power bill, mortgage, car payment...).</summary>
+/// <summary>A bill that repeats every month, week or two weeks (power bill, mortgage, daycare...).</summary>
 public class RecurringDebt
 {
     public int Id { get; set; }
@@ -24,9 +25,18 @@ public class RecurringDebt
     public int CategoryId { get; set; }
     public Category? Category { get; set; }
 
+    [Display(Name = "How often")]
+    public BillFrequency Frequency { get; set; } = BillFrequency.Monthly;
+
+    /// <summary>For a monthly bill: the day of the month it's due.</summary>
     [Display(Name = "Due day")]
     [Range(1, 31)]
     public int? DueDay { get; set; }
+
+    /// <summary>For a weekly or every-two-weeks bill: any date it's due. Later ones are counted from it.</summary>
+    [Display(Name = "First due date")]
+    [DataType(DataType.Date)]
+    public DateTime? StartDate { get; set; }
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
@@ -55,4 +65,27 @@ public class RecurringDebt
 
     [NotMapped]
     public bool IsLoan => Balance > 0;
+
+    /// <summary>What the bill costs in an average month (a weekly bill comes 52 times a year).</summary>
+    [NotMapped]
+    public decimal MonthlyAmount => Frequency switch
+    {
+        BillFrequency.Weekly => Math.Round(Amount * 52 / 12, 2),
+        BillFrequency.BiWeekly => Math.Round(Amount * 26 / 12, 2),
+        _ => Amount
+    };
+
+    /// <summary>
+    /// The days this bill is due in a month: one for a monthly bill (or none set), and every week or
+    /// every other week from the first due date for the others. Nothing before the first due date.
+    /// </summary>
+    public IReadOnlyList<int?> DueDaysIn(int year, int month)
+    {
+        if (Frequency == BillFrequency.Monthly || StartDate is not DateTime start) return [DueDay];
+        var step = Frequency == BillFrequency.Weekly ? 7 : 14;
+        return Dates.RepeatingInMonth(start, step, year, month)
+            .Where(d => d >= start.Date)
+            .Select(d => (int?)d.Day)
+            .ToList();
+    }
 }

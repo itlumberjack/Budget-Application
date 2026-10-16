@@ -33,6 +33,8 @@ using (var scope = app.Services.CreateScope())
     if (useInMemory) db.EnsureCreated(); // adds the starter categories
     else db.Migrate();
     app.Logger.LogInformation("Using {Provider} database", useInMemory ? "in-memory" : "MySQL");
+    // Archive months that have ended and build the next six months' budgets.
+    await scope.ServiceProvider.GetRequiredService<BudgetBuilder>().KeepMonthsCurrentAsync();
 }
 
 if (!app.Environment.IsDevelopment())

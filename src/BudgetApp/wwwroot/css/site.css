@@ -263,3 +263,8 @@ details > summary { cursor: pointer; }
 /* ---------- Leftover split under each payday ---------- */
 .split-table td { padding-top: .2rem; padding-bottom: .2rem; }
 .split-table tr:first-child td { border-top: 1px dashed var(--line); padding-top: .45rem; }
+
+/* ---------- Archived months are read-only ---------- */
+.archived .edit-only, .archived .block-add, .archived .shift-form,
+.archived [data-bs-target="#aiModal"], .archived .ps-3 form { display: none !important; }
+.archived tr.clickable, .archived .status-dot { pointer-events: none; cursor: default; }

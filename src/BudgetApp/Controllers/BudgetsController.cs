@@ -12,13 +12,15 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
 {
     public async Task<IActionResult> Index()
     {
+        await builder.KeepMonthsCurrentAsync();
         var months = await db.MonthlyBudgets
             .OrderBy(b => b.Year).ThenBy(b => b.Month)
             .Select(b => new MonthSummary(
                 b.Year, b.Month,
                 b.PayPeriods.Sum(p => p.BaseAmount) + b.PayPeriods.SelectMany(p => p.Extras).Sum(x => x.Amount),
                 b.Expenses.Sum(e => e.Amount),
-                b.Expenses.Where(e => e.Status == PaymentStatus.Complete).Sum(e => e.Amount)))
+                b.Expenses.Where(e => e.Status == PaymentStatus.Complete).Sum(e => e.Amount),
+                b.IsArchived))
             .ToListAsync();
 
         ViewBag.HasIncome = await db.IncomeSources.AnyAsync();
@@ -37,6 +39,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     public async Task<IActionResult> Month(int year, int month)
     {
         if (month is < 1 or > 12 || year is < 2000 or > 2100) return NotFound();
+        await builder.KeepMonthsCurrentAsync();
 
         var budget = await db.MonthlyBudgets.WithDetails().FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
 
@@ -95,6 +98,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstOrDefaultAsync(b => b.Id == id);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         var moved = 0;
         foreach (var move in moves)
         {
@@ -115,10 +119,37 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.FindAsync(id);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         var (pay, debts) = await builder.SyncAsync(id);
         TempData["Message"] = pay + debts == 0
             ? "Nothing new to add. This month already has every paycheck and recurring debt."
             : $"Added {pay} paycheck(s) and {debts} recurring debt(s).";
+        return RedirectToMonth(budget);
+    }
+
+    /// <summary>Archives a month by hand: hidden from the main list and read-only.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Archive(int id)
+    {
+        var budget = await db.MonthlyBudgets.FindAsync(id);
+        if (budget is null) return NotFound();
+        budget.IsArchived = true;
+        budget.KeepOpen = false;
+        await db.SaveChangesAsync();
+        TempData["Message"] = $"Archived {budget.Title}. It's under Archive on the Monthly Budgets page.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Reopens an archived month for changes. It stays open until it's archived again by hand.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Unarchive(int id)
+    {
+        var budget = await db.MonthlyBudgets.FindAsync(id);
+        if (budget is null) return NotFound();
+        budget.IsArchived = false;
+        budget.KeepOpen = true;
+        await db.SaveChangesAsync();
+        TempData["Message"] = $"{budget.Title} is open for changes again.";
         return RedirectToMonth(budget);
     }
 
@@ -138,6 +169,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.FindAsync(id);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         budget.Notes = notes;
         await db.SaveChangesAsync();
         return RedirectToMonth(budget);
@@ -150,6 +182,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.FindAsync(budgetId);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         db.PayPeriods.Add(new PayPeriod { MonthlyBudgetId = budgetId, Label = label.TrimToNull() ?? "Other income", PayDate = payDate, BaseAmount = amount });
         await db.SaveChangesAsync();
         return RedirectToMonth(budget);
@@ -160,6 +193,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
+        if (Archived(pay.MonthlyBudget!, out var locked)) return locked;
         pay.BaseAmount = baseAmount;
         pay.PayDate = payDate;
         await db.SaveChangesAsync();
@@ -173,6 +207,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (offset is not (1 or -1)) return BadRequest();
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
+        if (Archived(pay.MonthlyBudget!, out var locked)) return locked;
         var to = await builder.MovePaycheckAsync(id, offset, manual: true);
         TempData["Message"] = $"Moved {pay.Label}'s {pay.PayDate:MMMM d} paycheck to {to.Title}. You're looking at {to.Title} now.";
         return RedirectToMonth(to);
@@ -188,6 +223,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (offset is not (1 or -1)) return BadRequest();
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         var ids = payIds.Split(',').Select(x => int.TryParse(x, out var n) ? n : 0).ToHashSet();
         var pays = budget.PayPeriods.Where(p => ids.Contains(p.Id)).OrderBy(p => p.PayDate).ToList();
         if (pays.Count == 0) return RedirectToMonth(budget);
@@ -206,6 +242,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
+        if (Archived(pay.MonthlyBudget!, out var locked)) return locked;
         db.PayPeriods.Remove(pay);
         await db.SaveChangesAsync();
         return RedirectToMonth(pay.MonthlyBudget!);
@@ -216,6 +253,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == payPeriodId);
         if (pay is null) return NotFound();
+        if (Archived(pay.MonthlyBudget!, out var locked)) return locked;
         if (amount != 0)
         {
             db.PayPeriodExtras.Add(new PayPeriodExtra
@@ -235,6 +273,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         var extra = await db.PayPeriodExtras.Include(x => x.PayPeriod).ThenInclude(p => p!.MonthlyBudget)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (extra is null) return NotFound();
+        if (Archived(extra.PayPeriod!.MonthlyBudget!, out var locked)) return locked;
         db.PayPeriodExtras.Remove(extra);
         await db.SaveChangesAsync();
         return RedirectToMonth(extra.PayPeriod!.MonthlyBudget!, $"pay-{extra.PayPeriodId}");
@@ -248,6 +287,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
         if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
         if (string.IsNullOrWhiteSpace(title))
         {
             TempData["Error"] = "Give the expense a name.";
@@ -276,6 +316,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             .FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
         var budget = expense.MonthlyBudget!;
+        if (Archived(budget, out var locked)) return locked;
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
         expense.Company = company.TrimToNull();
         expense.Amount = amount;
@@ -292,6 +333,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
+        if (Archived(expense.MonthlyBudget!, out var locked)) return locked;
         if (!Enum.IsDefined(status)) return BadRequest();
         expense.Status = status;
         await db.SaveChangesAsync();
@@ -303,9 +345,19 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
     {
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
+        if (Archived(expense.MonthlyBudget!, out var locked)) return locked;
         db.BudgetExpenses.Remove(expense);
         await db.SaveChangesAsync();
         return RedirectToMonth(expense.MonthlyBudget!);
+    }
+
+    /// <summary>Archived months are read-only: changes are turned away with a note on how to reopen the month.</summary>
+    private bool Archived(MonthlyBudget budget, out IActionResult result)
+    {
+        result = RedirectToMonth(budget);
+        if (!budget.IsArchived) return false;
+        TempData["Error"] = $"{budget.Title} is archived. Unarchive it to make changes.";
+        return true;
     }
 
     private RedirectResult RedirectToMonth(int year, int month, string? anchor = null) =>

@@ -20,6 +20,13 @@ public static class QueryExtensions
         return months.Where(b => b.Year > start.Year || (b.Year == start.Year && b.Month >= start.Month));
     }
 
+    /// <summary>Months that ended before this one.</summary>
+    public static IQueryable<MonthlyBudget> BeforeThisMonth(this IQueryable<MonthlyBudget> months)
+    {
+        var start = Dates.ThisMonth;
+        return months.Where(b => b.Year < start.Year || (b.Year == start.Year && b.Month < start.Month));
+    }
+
     /// <summary>Categories in the order the budget sections are shown.</summary>
     public static IQueryable<Category> InDisplayOrder(this IQueryable<Category> categories) =>
         categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name);

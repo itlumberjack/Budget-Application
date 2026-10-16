@@ -49,6 +49,17 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Weekly bills, six months ahead, and the archive
+
+- A recurring bill can be **monthly** (with a due day), **weekly** or **every two weeks**. For the last two,
+  give any date it's due; each month gets a copy for every week (or every other week) from then on. The
+  Recurring Debts page totals what a typical month costs (a weekly bill counts 52 times a year).
+- Budgets are always built through **six months ahead**. This happens when the app starts and whenever you
+  open Monthly Budgets or a month, so new months appear on their own.
+- When a month is over it's **archived**: it moves to the Archive list at the bottom of Monthly Budgets and
+  becomes read-only. Open it and choose **Unarchive to make changes** to edit it again; it then stays open
+  until you click **Archive this month**.
+
 ## Settings: buffer and leftover split
 
 The gear button at the top opens **Settings**. Each payday's left over is shared in two steps: a buffer

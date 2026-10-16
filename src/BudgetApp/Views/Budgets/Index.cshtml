@@ -63,8 +63,12 @@
     }
 </div>
 
+@{
+    var open = Model.Where(m => !m.IsArchived).ToList();
+    var archived = Model.Where(m => m.IsArchived).OrderByDescending(m => m.Year).ThenByDescending(m => m.Month).ToList();
+}
 <h2 class="h6 text-uppercase text-muted fw-semibold mb-2">All months</h2>
-@if (Model.Count == 0)
+@if (open.Count == 0)
 {
     <div class="card empty-state">
         <i class="bi bi-calendar3"></i>
@@ -74,7 +78,7 @@
 else
 {
     <div class="row g-3">
-        @foreach (var m in Model.OrderByDescending(m => m.Year).ThenByDescending(m => m.Month))
+        @foreach (var m in open.OrderBy(m => m.Year).ThenBy(m => m.Month))
         {
             var pct = m.Expenses > 0 ? (int)(m.Complete / m.Expenses * 100) : 0;
             <div class="col-sm-6 col-lg-4">
@@ -98,4 +102,24 @@ else
             </div>
         }
     </div>
+}
+
+@if (archived.Count > 0)
+{
+    <details class="mt-4">
+        <summary class="h6 text-uppercase text-muted fw-semibold"><i class="bi bi-archive me-1"></i> Archive (@archived.Count)</summary>
+        <p class="item-meta mt-2">Months that are over. They're read-only; open one and choose Unarchive to change it.</p>
+        <div class="list-group">
+            @foreach (var m in archived)
+            {
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="@Url.RouteUrl("month", new { year = m.Year, month = m.Month })">
+                    <span class="fw-semibold">@m.Title</span>
+                    <span class="small">
+                        <span class="text-muted">Left over</span>
+                        <span class="money ms-1 @(m.Remaining < 0 ? "text-danger" : "text-success")">@m.Remaining.ToString("C")</span>
+                    </span>
+                </a>
+            }
+        </div>
+    </details>
 }

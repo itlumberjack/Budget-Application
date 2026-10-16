@@ -14,7 +14,7 @@ public class DebtController(BudgetDbContext db) : Controller
     {
         var loans = await db.RecurringDebts.Where(d => d.IsActive && d.Balance > 0).OrderBy(d => d.Id).ToListAsync();
         var settings = await db.GetDebtPlanAsync();
-        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.Amount, d.PayoffPriority)).ToList();
+        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
         var firstMonth = Dates.ThisMonth.AddMonths(1);
 
         PayoffPlan Run(PayoffStrategy s) =>

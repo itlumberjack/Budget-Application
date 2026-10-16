@@ -7,7 +7,7 @@
 <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
     <div>
         <h1 class="mb-1">Recurring Debts</h1>
-        <p class="page-subtitle mb-0">Bills that come every month. New months start with these; changing one here leaves months you've already made alone.</p>
+        <p class="page-subtitle mb-0">Bills that come every month, week or two weeks. New months start with these; changing one here leaves months you've already made alone.</p>
     </div>
     <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add a bill</a>
 </div>
@@ -24,8 +24,8 @@
 else
 {
     <div class="card stat mb-3 d-flex flex-row align-items-center justify-content-between">
-        <div class="label mb-0"><span class="stat-icon icon-spend"><i class="bi bi-calendar2-check"></i></span> Every month (active bills)</div>
-        <div class="value money">@Model.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</div>
+        <div class="label mb-0"><span class="stat-icon icon-spend"><i class="bi bi-calendar2-check"></i></span> A typical month (active bills)</div>
+        <div class="value money">@Model.Where(d => d.IsActive).Sum(d => d.MonthlyAmount).ToString("C")</div>
     </div>
 
     <div class="row g-3">
@@ -35,7 +35,7 @@ else
                 <div class="card h-100">
                     <div class="card-header d-flex justify-content-between">
                         <span>@g.Key?.Name</span>
-                        <span class="money">@g.Where(d => d.IsActive).Sum(d => d.Amount).ToString("C")</span>
+                        <span class="money">@g.Where(d => d.IsActive).Sum(d => d.MonthlyAmount).ToString("C")</span>
                     </div>
                     <div class="list-group list-group-flush">
                         @foreach (var d in g)
@@ -45,14 +45,20 @@ else
                                     <div class="item-title">@d.Title @if (!d.IsActive) { <span class="badge text-bg-secondary">inactive</span> }</div>
                                     <div class="item-meta">
                                         @d.Company
-                                        @if (d.DueDay is int due) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")Due on the @Dates.Ordinal(due)</span> }
+                                        @{ var when = d.Frequency switch
+                                           {
+                                               BillFrequency.Weekly => $"Every {d.StartDate?.DayOfWeek}",
+                                               BillFrequency.BiWeekly => $"Every other {d.StartDate?.DayOfWeek}, from {d.StartDate:MMM d}",
+                                               _ => d.DueDay is int due ? $"Due on the {Dates.Ordinal(due)}" : null
+                                           }; }
+                                        @if (when is not null) { <span>@(string.IsNullOrEmpty(d.Company) ? "" : "· ")@when</span> }
                                     </div>
                                     @if (d.IsLoan)
                                     {
                                         <div class="item-meta"><i class="bi bi-bank"></i> @d.Balance!.Value.ToString("C0") owed@(d.InterestRate is decimal r ? $" at {r:0.###}%" : "")</div>
                                     }
                                 </div>
-                                <div class="fw-semibold money">@d.Amount.ToString("C")</div>
+                                <div class="fw-semibold money text-end">@d.Amount.ToString("C")@if (d.Frequency != BillFrequency.Monthly) {<div class="item-meta fw-normal">@(d.Frequency == BillFrequency.Weekly ? "a week" : "every 2 weeks")</div>}</div>
                                 <i class="bi bi-chevron-right text-muted"></i>
                             </a>
                         }

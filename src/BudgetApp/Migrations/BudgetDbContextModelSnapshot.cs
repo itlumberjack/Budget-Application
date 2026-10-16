@@ -286,6 +286,12 @@ namespace BudgetApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("KeepOpen")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("Month")
                         .HasColumnType("int");
 
@@ -388,6 +394,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("InterestRate")
                         .HasColumnType("decimal(6,3)");
 
@@ -396,6 +405,9 @@ namespace BudgetApp.Migrations
 
                     b.Property<int?>("PayoffPriority")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Title")
                         .IsRequired()
