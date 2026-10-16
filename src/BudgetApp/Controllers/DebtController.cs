@@ -23,11 +23,12 @@ public class DebtController(BudgetDbContext db) : Controller
         var model = new DebtPageModel { Loans = loans, Settings = settings };
         if (inputs.Count > 0)
         {
-            model.Plan = Run(settings.Strategy);
-            model.MinimumOnly = Run(PayoffStrategy.MinimumOnly);
             model.Comparison = Enum.GetValues<PayoffStrategy>()
                 .Where(s => s is not (PayoffStrategy.CustomLowestFirst or PayoffStrategy.CustomHighestFirst) || loans.Any(l => l.PayoffPriority is not null))
                 .Select(Run).ToList();
+            // Reuse the comparison's runs rather than simulating the same plans again.
+            model.Plan = model.Comparison.FirstOrDefault(p => p.Strategy == settings.Strategy) ?? Run(settings.Strategy);
+            model.MinimumOnly = model.Comparison.First(p => p.Strategy == PayoffStrategy.MinimumOnly);
         }
         return View(model);
     }

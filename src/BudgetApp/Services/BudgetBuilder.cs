@@ -52,25 +52,34 @@ public class BudgetBuilder(BudgetDbContext db)
             .FirstAsync(b => b.Id == budgetId);
         var rules = await db.GetRulesAsync();
 
+        var paydays = sources
+            .SelectMany(s => PaySchedule.PaydaysForBudget(s, budget.Year, budget.Month, rules).Select(d => (Source: s, Date: d)))
+            .ToList();
+        // Paychecks already budgeted, in this month or another one (moved there with "Move to next month"),
+        // looked up in one query rather than one per payday.
+        var sourceIds = paydays.Select(p => p.Source.Id).Distinct().ToList();
+        var dates = paydays.Select(p => p.Date).Distinct().ToList();
+        var existing = paydays.Count == 0 ? [] : (await db.PayPeriods
+                .Where(p => p.IncomeSourceId != null && sourceIds.Contains(p.IncomeSourceId.Value) && dates.Contains(p.PayDate))
+                .Select(p => new { p.IncomeSourceId, p.PayDate })
+                .ToListAsync())
+            .Select(p => (p.IncomeSourceId!.Value, p.PayDate.Date))
+            .ToHashSet();
+
         var addedPay = 0;
-        foreach (var source in sources)
+        foreach (var (source, payday) in paydays)
         {
-            foreach (var payday in PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month, rules))
+            if (budget.PayPeriods.Any(p => p.IncomeSourceId == source.Id && p.PayDate.Date == payday)
+                || existing.Contains((source.Id, payday)))
+                continue;
+            budget.PayPeriods.Add(new PayPeriod
             {
-                if (budget.PayPeriods.Any(p => p.IncomeSourceId == source.Id && p.PayDate.Date == payday))
-                    continue;
-                // Already budgeted in another month (moved there with "Move to next month").
-                if (await db.PayPeriods.AnyAsync(p => p.IncomeSourceId == source.Id && p.PayDate == payday))
-                    continue;
-                budget.PayPeriods.Add(new PayPeriod
-                {
-                    IncomeSourceId = source.Id,
-                    Label = source.Name,
-                    PayDate = payday,
-                    BaseAmount = source.TakeHomeAmount
-                });
-                addedPay++;
-            }
+                IncomeSourceId = source.Id,
+                Label = source.Name,
+                PayDate = payday,
+                BaseAmount = source.TakeHomeAmount
+            });
+            addedPay++;
         }
         // Paychecks need ids before bills can point at them.
         await db.SaveChangesAsync();
@@ -111,13 +120,16 @@ public class BudgetBuilder(BudgetDbContext db)
         var sources = await db.IncomeSources.ToDictionaryAsync(s => s.Id);
         var moved = 0;
 
-        var paychecks = await db.PayPeriods.Include(p => p.MonthlyBudget)
-            .Where(p => p.IncomeSourceId != null)
-            .ToListAsync();
         // Last month is included so its end-of-month paycheck can move into this month (and back again).
-        foreach (var pay in paychecks.Where(p => p.MonthlyBudget!.FirstDay >= thisMonth.AddMonths(-1)).OrderBy(p => p.PayDate))
+        var lastMonth = thisMonth.AddMonths(-1);
+        var paychecks = await db.PayPeriods.Include(p => p.MonthlyBudget)
+            .Where(p => p.IncomeSourceId != null && !p.ManuallyMoved)
+            .Where(p => p.MonthlyBudget!.Year > lastMonth.Year || (p.MonthlyBudget.Year == lastMonth.Year && p.MonthlyBudget.Month >= lastMonth.Month))
+            .OrderBy(p => p.PayDate)
+            .ToListAsync();
+        foreach (var pay in paychecks)
         {
-            if (pay.ManuallyMoved || !sources.TryGetValue(pay.IncomeSourceId!.Value, out var source)) continue;
+            if (!sources.TryGetValue(pay.IncomeSourceId!.Value, out var source)) continue;
             var belongs = PaySchedule.BudgetMonthFor(source, pay.PayDate, rules);
             var current = pay.MonthlyBudget!.FirstDay;
             if (belongs == current || (belongs < thisMonth && current < thisMonth)) continue;
@@ -132,8 +144,10 @@ public class BudgetBuilder(BudgetDbContext db)
         var ids = await db.MonthlyBudgets.FromThisMonth()
             .OrderBy(b => b.Year).ThenBy(b => b.Month)
             .Select(b => b.Id).ToListAsync();
+        var activeSources = sources.Values.Where(s => s.IsActive).ToList();
+        var activeDebts = await db.RecurringDebts.Where(d => d.IsActive).ToListAsync();
         foreach (var id in ids)
-            await SyncAsync(id);
+            await SyncAsync(id, activeSources, activeDebts);
         return moved;
     }
 
