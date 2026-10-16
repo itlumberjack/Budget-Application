@@ -9,6 +9,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
     public DbSet<DebtPlanSettings> DebtPlanSettings => Set<DebtPlanSettings>();
+    public DbSet<HouseholdSettings> HouseholdSettings => Set<HouseholdSettings>();
     public DbSet<RecurringDebt> RecurringDebts => Set<RecurringDebt>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
     public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
@@ -20,6 +21,9 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
 
     /// <summary>The Debt Payoff page's plan (a single row).</summary>
     public Task<DebtPlanSettings> GetDebtPlanAsync() => SingleRowAsync(DebtPlanSettings);
+
+    /// <summary>The buffer and the leftover split, from the Settings page (a single row).</summary>
+    public Task<HouseholdSettings> GetHouseholdAsync() => SingleRowAsync(HouseholdSettings);
 
     /// <summary>Row 1 of a one-row settings table, added if it's missing.</summary>
     private static async Task<T> SingleRowAsync<T>(DbSet<T> set) where T : class, ISingleRow, new() =>
@@ -43,6 +47,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
 
         b.Entity<BudgetRules>().HasData(new BudgetRules { Id = 1 });
         b.Entity<DebtPlanSettings>().HasData(new DebtPlanSettings { Id = 1 });
+        b.Entity<HouseholdSettings>().HasData(new HouseholdSettings { Id = 1 });
 
         // Starter categories, matching the sections of the family's budget spreadsheet.
         b.Entity<Category>().HasData(

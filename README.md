@@ -49,6 +49,21 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Settings: buffer and leftover split
+
+The gear button at the top opens **Settings**. Each payday's left over is shared in two steps: a buffer
+(20% to start) is held back as padding, and the rest is split between the two of you (50/50 to start).
+Both percentages and both names can be changed there. Under every payday on the month page you'll see the
+buffer and each person's share, and the **Left over** tile adds them up for the month. A payday that's
+short (left over below zero) has nothing to split.
+
+## Even out
+
+**Even out** on a month page suggests moving unpaid bills between paydays so each payday has about the
+same amount left over. A bill only moves to a payday on or before its due day (or to the first payday),
+so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
+**Apply selected**.
+
 ## Shifting the first or last payday
 
 On a month page, the first payday column has a left arrow and the last one has a right arrow. The left

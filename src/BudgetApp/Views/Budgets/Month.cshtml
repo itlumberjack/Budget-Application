@@ -40,6 +40,8 @@
     var usedCategoryIds = b.Expenses.Select(e => e.CategoryId).ToHashSet();
     // With no bills at all, show every section so there's somewhere to add one.
     var canHideEmpty = usedCategoryIds.Count > 0 && usedCategoryIds.Count < Model.Categories.Count;
+    var household = Model.Household;
+    var split = Model.TotalSplit;
 }
 
 <!-- Totals -->
@@ -76,7 +78,14 @@
         <div class="card stat @(Model.Remaining < 0 ? "border border-danger" : "")">
             <div class="label"><span class="stat-icon icon-left"><i class="bi bi-piggy-bank"></i></span> Left over</div>
             <div class="value money mt-1 @(Model.Remaining < 0 ? "text-danger" : "text-success")">@Model.Remaining.ToString("C")</div>
-            <div class="hint">@(Model.Remaining < 0 ? "Planned spending is more than income" : "After every planned bill")</div>
+            @if (split.Shared > 0)
+            {
+                <div class="hint">@Model.Household.FirstPartnerName <span class="money">@split.First.ToString("C")</span> &middot; @Model.Household.SecondPartnerName <span class="money">@split.Second.ToString("C")</span> &middot; buffer <span class="money">@split.Buffer.ToString("C")</span></div>
+            }
+            else
+            {
+                <div class="hint">@(Model.Remaining < 0 ? "Planned spending is more than income" : "After every planned bill")</div>
+            }
         </div>
     </div>
 </div>
@@ -88,7 +97,12 @@
             <button type="button" class="btn btn-sm btn-outline-primary" data-jump="@i">@columns[i].Heading</button>
         }
     </div>
-    <button type="button" class="btn btn-sm btn-ai" data-bs-toggle="modal" data-bs-target="#aiModal">
+    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#aiModal"
+            data-url="@Url.Action("EvenOut")" data-title="Even out paydays" data-icon="bi-distribute-horizontal">
+        <i class="bi bi-distribute-horizontal me-1"></i> Even out
+    </button>
+    <button type="button" class="btn btn-sm btn-ai" data-bs-toggle="modal" data-bs-target="#aiModal"
+            data-url="@Url.Action("SuggestArrangement")" data-title="Suggested arrangement" data-icon="bi-stars">
         <i class="bi bi-stars me-1"></i> Suggest arrangement
     </button>
     <div class="form-check form-switch mb-0 small @(canHideEmpty ? "" : "d-none")">
@@ -236,6 +250,17 @@
                         <tr><td>Left over</td><td class="text-end money @(col.LeftOver < 0 ? "text-danger" : "text-success")">@col.LeftOver.ToString("C")</td></tr>
                     </tfoot>
                 </table>
+                @if (!col.IsUnassigned && col.LeftOver > 0)
+                {
+                    var share = household.Split(col.LeftOver);
+                    <table class="sheet-table split-table small">
+                        <tbody>
+                            <tr><td class="text-muted">Buffer (@household.BufferPercent.ToString("0.##")%)</td><td class="text-end money text-muted">@share.Buffer.ToString("C")</td></tr>
+                            <tr><td>@household.FirstPartnerName</td><td class="text-end money">@share.First.ToString("C")</td></tr>
+                            <tr><td>@household.SecondPartnerName</td><td class="text-end money">@share.Second.ToString("C")</td></tr>
+                        </tbody>
+                    </table>
+                }
             </div>
         }
     </div>
@@ -401,7 +426,7 @@
         <form class="modal-content" asp-action="ApplyArrangement" method="post" id="aiForm">
             <input type="hidden" name="id" value="@b.Id" />
             <div class="modal-header">
-                <h2 class="modal-title h5" id="aiModalTitle"><i class="bi bi-stars text-ai me-1"></i> Suggested arrangement</h2>
+                <h2 class="modal-title h5" id="aiModalTitle"><i class="bi bi-stars text-ai me-1" id="aiModalIcon"></i> <span>Suggested arrangement</span></h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -491,18 +516,21 @@
             const first = (e.relatedTarget.dataset.payIds || '').split(',')[0];
             if (first) e.target.querySelector('select[name=payPeriodId]').value = first;
         });
-        // AI helper: ask for a suggestion each time the dialog opens.
+        // "Even out" and the AI helper share one dialog: each button names where its suggestion comes from.
         const aiForm = document.getElementById('aiForm');
         const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
         const nth = d => d + ([, 'st', 'nd', 'rd'][d % 100 >> 3 ^ 1 && d % 10] || 'th');
         const esc = t => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
-        document.getElementById('aiModal').addEventListener('show.bs.modal', async () => {
+        document.getElementById('aiModal').addEventListener('show.bs.modal', async e => {
+            const source = e.relatedTarget.dataset;
+            document.querySelector('#aiModalTitle span').textContent = source.title;
+            document.getElementById('aiModalIcon').className = `bi ${source.icon} text-ai me-1`;
             const show = id => ['aiLoading', 'aiError', 'aiResult'].forEach(x => document.getElementById(x).classList.toggle('d-none', x !== id));
             const apply = document.getElementById('aiApply');
             show('aiLoading');
             apply.disabled = true;
             try {
-                const res = await fetch('@Url.Action("SuggestArrangement")', { method: 'POST', body: new FormData(aiForm) });
+                const res = await fetch(source.url, { method: 'POST', body: new FormData(aiForm) });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
                 document.getElementById('aiSummary').textContent = data.summary;

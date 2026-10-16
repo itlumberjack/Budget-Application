@@ -1,0 +1,88 @@
+@model HouseholdSettings
+@{
+    ViewData["Title"] = "Settings";
+    var example = Model.Split(200);
+}
+
+<div class="mx-auto" style="max-width:40rem">
+<h1 class="mb-1">Settings</h1>
+<p class="page-subtitle mb-3">How the money left over on each payday is shared.</p>
+
+<form asp-action="Save" method="post" id="splitForm">
+    <input type="hidden" asp-for="Id" />
+    <div class="card mb-3"><div class="card-body p-3 p-md-4">
+        <h2 class="h5 mb-1"><i class="bi bi-shield-check text-brand me-1"></i> Buffer</h2>
+        <p class="item-meta mb-3">Held back from each payday's left over as padding before anything is split.</p>
+        <label asp-for="BufferPercent" class="form-label">Keep as a buffer</label>
+        <div class="input-group" style="max-width:12rem">
+            <input asp-for="BufferPercent" value="@Model.BufferPercent.ToString("0.##")" class="form-control" type="number" step="1" min="0" max="100" inputmode="decimal" />
+            <span class="input-group-text">%</span>
+        </div>
+        <span asp-validation-for="BufferPercent" class="text-danger"></span>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body p-3 p-md-4">
+        <h2 class="h5 mb-1"><i class="bi bi-people text-brand me-1"></i> Split</h2>
+        <p class="item-meta mb-3">What's left after the buffer is divided between the two of you.</p>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <label asp-for="FirstPartnerName" class="form-label">Name</label>
+                <input asp-for="FirstPartnerName" class="form-control" />
+                <span asp-validation-for="FirstPartnerName" class="text-danger"></span>
+                <label asp-for="FirstPartnerPercent" class="form-label mt-2">Share</label>
+                <div class="input-group">
+                    <input asp-for="FirstPartnerPercent" value="@Model.FirstPartnerPercent.ToString("0.##")" class="form-control" type="number" step="1" min="0" max="100" inputmode="decimal" />
+                    <span class="input-group-text">%</span>
+                </div>
+                <span asp-validation-for="FirstPartnerPercent" class="text-danger"></span>
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="SecondPartnerName" class="form-label">Name</label>
+                <input asp-for="SecondPartnerName" class="form-control" />
+                <span asp-validation-for="SecondPartnerName" class="text-danger"></span>
+                <label class="form-label mt-2" for="secondShare">Share</label>
+                <div class="input-group">
+                    <input id="secondShare" class="form-control" value="@Model.SecondPartnerPercent.ToString("0.##")" disabled />
+                    <span class="input-group-text">%</span>
+                </div>
+                <div class="form-text">The rest of the split.</div>
+            </div>
+        </div>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body p-3 p-md-4">
+        <h2 class="h6 text-muted mb-2">Example: a payday with $200.00 left over</h2>
+        <table class="table table-sm mb-0">
+            <tbody>
+                <tr><td>Buffer</td><td class="text-end money" id="exBuffer">@example.Buffer.ToString("C")</td></tr>
+                <tr><td id="exFirstName">@Model.FirstPartnerName</td><td class="text-end money" id="exFirst">@example.First.ToString("C")</td></tr>
+                <tr><td id="exSecondName">@Model.SecondPartnerName</td><td class="text-end money" id="exSecond">@example.Second.ToString("C")</td></tr>
+            </tbody>
+        </table>
+    </div></div>
+
+    <button class="btn btn-primary">Save settings</button>
+</form>
+
+<p class="item-meta mt-4">Looking for Brad's rule? It's at the top of <a asp-controller="Income" asp-action="Index">Pay &amp; Schedule</a>.</p>
+</div>
+
+@section Scripts {
+    <script>
+        // Keep the second share and the example up to date while typing.
+        const form = document.getElementById('splitForm');
+        const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        const round = n => Math.round(n * 100) / 100;
+        form.addEventListener('input', () => {
+            const buffer = +form.elements['BufferPercent'].value || 0;
+            const first = +form.elements['FirstPartnerPercent'].value || 0;
+            document.getElementById('secondShare').value = Math.max(0, 100 - first);
+            const held = round(200 * buffer / 100), shared = 200 - held, firstAmt = round(shared * first / 100);
+            document.getElementById('exBuffer').textContent = money(held);
+            document.getElementById('exFirst').textContent = money(firstAmt);
+            document.getElementById('exSecond').textContent = money(shared - firstAmt);
+            document.getElementById('exFirstName').textContent = form.elements['FirstPartnerName'].value;
+            document.getElementById('exSecondName').textContent = form.elements['SecondPartnerName'].value;
+        });
+    </script>
+}

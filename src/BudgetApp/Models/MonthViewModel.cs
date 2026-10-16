@@ -8,6 +8,7 @@ public class MonthViewModel
     public int Month { get; init; }
     public MonthlyBudget? Budget { get; init; }
     public List<Category> Categories { get; init; } = new();
+    public HouseholdSettings Household { get; init; } = new();
 
     public DateTime FirstDay => new(Year, Month, 1);
     public string Title => FirstDay.MonthTitle();
@@ -47,4 +48,7 @@ public class MonthViewModel
     public decimal TotalWithStatus(PaymentStatus status) =>
         Budget?.Expenses.Where(e => e.Status == status).Sum(e => e.Amount) ?? 0;
     public decimal Remaining => TotalIncome - TotalExpenses;
+
+    /// <summary>The month's buffer and each partner's share, added up over its paydays.</summary>
+    public LeftoverSplit TotalSplit => LeftoverSplit.Sum(Columns.Where(c => !c.IsUnassigned).Select(c => Household.Split(c.LeftOver)));
 }

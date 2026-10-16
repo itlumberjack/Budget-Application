@@ -59,7 +59,8 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             Year = year,
             Month = month,
             Budget = budget,
-            Categories = await db.Categories.InDisplayOrder().ToListAsync()
+            Categories = await db.Categories.InDisplayOrder().ToListAsync(),
+            Household = await db.GetHouseholdAsync()
         };
     }
 
@@ -77,6 +78,15 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         {
             return Json(new { error = ex.Message });
         }
+    }
+
+    /// <summary>Suggests moving unpaid bills so each payday has about the same left over. Changes nothing.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> EvenOut(int id)
+    {
+        var budget = await db.MonthlyBudgets.WithDetails().FirstOrDefaultAsync(b => b.Id == id);
+        if (budget is null) return NotFound();
+        return Json(BillBalancer.Suggest(await MonthModelAsync(budget.Year, budget.Month, budget)));
     }
 
     /// <summary>Applies the suggested moves the user kept. Each move is "expenseId:payPeriodId".</summary>

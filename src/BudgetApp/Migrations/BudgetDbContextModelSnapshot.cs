@@ -209,6 +209,43 @@ namespace BudgetApp.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.HouseholdSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("BufferPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("FirstPartnerName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<decimal>("FirstPartnerPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("SecondPartnerName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("HouseholdSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            BufferPercent = 20m,
+                            FirstPartnerName = "Brad",
+                            FirstPartnerPercent = 50m,
+                            SecondPartnerName = "Jessica"
+                        });
+                });
+
             modelBuilder.Entity("BudgetApp.Models.IncomeSource", b =>
                 {
                     b.Property<int>("Id")
