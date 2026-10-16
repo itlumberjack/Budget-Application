@@ -47,7 +47,10 @@
                         </li>
                     }
                 </ul>
-                <button type="button" class="btn theme-toggle icon-btn rounded-circle ms-auto ms-md-2" id="themeToggle" title="Switch between dark and light" aria-label="Switch between dark and light">
+                <a class="btn theme-toggle icon-btn rounded-circle ms-auto ms-md-2 @(controller == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index" title="Settings" aria-label="Settings">
+                    <i class="bi bi-gear"></i>
+                </a>
+                <button type="button" class="btn theme-toggle icon-btn rounded-circle ms-2" id="themeToggle" title="Switch between dark and light" aria-label="Switch between dark and light">
                     <i class="bi bi-sun"></i><i class="bi bi-moon-stars"></i>
                 </button>
             </div>

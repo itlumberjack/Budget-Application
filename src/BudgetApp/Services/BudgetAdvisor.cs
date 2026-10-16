@@ -156,15 +156,7 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
                 (string?)m["reason"] ?? ""));
         }
 
-        var outcomes = columns.Select(c =>
-        {
-            var after = c.LeftOver
-                + moves.Where(mv => c.Expenses.Any(e => e.Id == mv.ExpenseId)).Sum(mv => mv.Amount)
-                - moves.Where(mv => mv.To == c.Heading).Sum(mv => mv.Amount);
-            return new ColumnOutcome(c.Heading, c.LeftOver, after);
-        }).ToList();
-
-        return new ArrangementSuggestion((string?)input["summary"] ?? "", moves, outcomes);
+        return new ArrangementSuggestion((string?)input["summary"] ?? "", moves, ColumnOutcome.For(columns, moves));
     }
 
     /// <summary>The "message" from an API error body, if there is one.</summary>

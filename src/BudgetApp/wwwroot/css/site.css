@@ -142,7 +142,7 @@ h1, .h1 { font-weight: 700; letter-spacing: -.02em; font-size: 1.75rem; }
 .app-header .nav-link:hover { color: #fff; background: rgba(255, 255, 255, .12); }
 .app-header .nav-link.active { color: var(--nav-active-ink); background: var(--nav-active-bg); }
 .theme-toggle { color: #fff; background: rgba(255, 255, 255, .12); border: 0; }
-.theme-toggle:hover { color: #fff; background: rgba(255, 255, 255, .22); }
+.theme-toggle:hover, .theme-toggle.active { color: #fff; background: rgba(255, 255, 255, .22); }
 [data-bs-theme="dark"] .theme-toggle .bi-moon-stars,
 :root:not([data-bs-theme="dark"]) .theme-toggle .bi-sun { display: none; }
 
@@ -259,3 +259,7 @@ details > summary { cursor: pointer; }
 .line-plan { stroke: var(--brand-ink); background: var(--brand-ink); }
 .line-baseline { stroke: var(--muted); background: var(--muted); stroke-dasharray: 6 4; }
 .legend-line { display: inline-block; width: 1.4rem; height: 3px; vertical-align: middle; border-radius: 2px; }
+
+/* ---------- Leftover split under each payday ---------- */
+.split-table td { padding-top: .2rem; padding-bottom: .2rem; }
+.split-table tr:first-child td { border-top: 1px dashed var(--line); padding-top: .45rem; }
