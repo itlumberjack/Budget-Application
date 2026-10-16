@@ -1,14 +1,20 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
+using BudgetApp.Api;
 using BudgetApp.Data;
 using BudgetApp.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 // User secrets (where the Anthropic API key lives) load in every environment, not only Development.
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 
-builder.Services.AddControllersWithViews();
+// Every page needs someone signed in, apart from the sign-in pages themselves.
+builder.Services.AddControllersWithViews(o => o.Filters.Add(new AuthorizeFilter()));
 // "InMemory" keeps everything in memory (handy for testing; data is lost when the app stops).
 // "MySql" uses the Budget connection string.
 var useInMemory = string.Equals(builder.Configuration["Database:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase);
@@ -20,7 +26,34 @@ builder.Services.AddDbContext<BudgetDbContext>(options =>
         options.UseMySQL(builder.Configuration.GetConnectionString("Budget")
             ?? throw new InvalidOperationException("Connection string 'Budget' is missing from appsettings.json."));
 });
+
+// Sign-in for the website (a cookie) and the phone app (bearer tokens from /api/auth/login).
+// Accounts are added on the website: the first one on the setup page, the rest under Settings > Sign-ins.
+builder.Services.AddIdentityApiEndpoints<IdentityUser>(o =>
+    {
+        o.Password.RequiredLength = 8;
+        o.Password.RequireNonAlphanumeric = false;
+        o.User.RequireUniqueEmail = true;
+    })
+    .AddEntityFrameworkStores<BudgetDbContext>();
+// Pages use the sign-in cookie (and send people to the sign-in page); only /api uses bearer tokens.
+builder.Services.AddAuthentication(o => o.DefaultScheme = IdentityConstants.ApplicationScheme);
+builder.Services.ConfigureApplicationCookie(o =>
+{
+    o.LoginPath = "/Account/Login";
+    o.AccessDeniedPath = "/Account/Login";
+    o.ExpireTimeSpan = TimeSpan.FromDays(30);
+    o.SlidingExpiration = true;
+});
+// Check the account on every request, so removing someone's sign-in signs them out right away.
+builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.Zero);
+// Keep the keys that protect sign-ins in the database, so a restart or a new publish doesn't sign everyone out.
+builder.Services.AddDataProtection().PersistKeysToDbContext<BudgetDbContext>().SetApplicationName("BudgetApp");
+// The API sends statuses and strategies as words ("Complete"), not numbers.
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
 builder.Services.AddScoped<BudgetBuilder>();
+builder.Services.AddScoped<MonthService>();
 // The optional AI helper on the month page. Needs Anthropic:ApiKey (see README).
 builder.Services.AddHttpClient<BudgetAdvisor>(c => c.Timeout = TimeSpan.FromMinutes(2));
 
@@ -56,8 +89,11 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapStaticAssets();
+
+app.MapBudgetApi();
 
 app.MapControllerRoute(
     name: "month",

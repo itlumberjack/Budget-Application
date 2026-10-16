@@ -132,6 +132,41 @@ export Anthropic__ApiKey="<your key>"
 `Anthropic:Model` in appsettings.json picks the model (default `claude-opus-5-5`). Each suggestion
 sends the month's paycheck amounts, bill names and amounts to Anthropic's API.
 
+## Signing in
+
+Every page needs someone signed in.
+
+- **First run:** the site opens a setup page to create the first sign-in (an email and a password with at least 8 characters, an uppercase letter, a lowercase letter and a number). The setup page goes away once an account exists, so create yours right after you publish.
+- **Adding Jessica:** Settings > Sign-ins. You pick her email and password; she can change the password after she signs in. The same page removes a sign-in (it stops working right away) and changes your own password.
+- **Forgot a password:** the other person removes the sign-in and adds it again with a new password. There's no email reset.
+- With the in-memory database the sign-ins disappear when the app stops, like everything else.
+
+## Phone app API
+
+The site also answers JSON under `/api` for the phone app. Sign in with the same email and password:
+
+```
+POST /api/auth/login     {"email": "...", "password": "..."}   -> accessToken (1 hour) and refreshToken
+POST /api/auth/refresh   {"refreshToken": "..."}               -> new tokens
+```
+
+Send `Authorization: Bearer <accessToken>` on every other call. The site's sign-in cookie doesn't work for `/api`.
+
+| Call | What it does |
+| --- | --- |
+| `GET /api/me` | Who is signed in |
+| `GET /api/months` | Every month's totals (archived ones are flagged) |
+| `GET /api/months/{year}/{month}` | A month's paydays, the bills under each, left over and the split |
+| `PUT /api/bills/{id}/status` | `{"status": "Complete"}` (or `Pending`, `NotPaid`) |
+| `PUT /api/bills/{id}/payday` | `{"payPeriodId": 12}` moves a bill to another paycheck in its month (`null` for Not assigned) |
+| `POST /api/months/{id}/even-out` | Even out's suggestions. Changes nothing |
+| `POST /api/months/{id}/moves` | `{"moves": [{"expenseId": 5, "payPeriodId": 12}]}` applies the moves you keep |
+| `GET`/`PUT /api/settings` | Buffer and leftover split |
+| `GET /api/debt-plan` | Loans, the chosen payoff plan, and every strategy compared |
+| `GET /api/categories`, `/api/recurring-bills`, `/api/income` | The lists from the site |
+
+Archived months are read-only: changes come back as `409` with a message. The request and response shapes live in `src/BudgetApp.Core/Contracts`, so the phone app can reference the Core library and use the same classes.
+
 ## Project layout
 
 - `src/BudgetApp`: the website (pages, database, AI helper).
@@ -147,5 +182,5 @@ Database__Provider=MySql dotnet ef migrations add <Name> -p src/BudgetApp
 
 ## Notes
 
-- There is no login. It's meant to run on your own computer or home network; add ASP.NET Core Identity before exposing it to the internet.
+- Put the site behind HTTPS before using it over the internet, since passwords and phone app tokens travel with every request.
 - A paycheck belongs to the month its payday falls in, so a weekly paycheck shows up four or five times depending on the month.

@@ -1,5 +1,6 @@
 @{
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var signedIn = User.Identity?.IsAuthenticated == true;
     var nav = new[]
     {
         (Controller: "Budgets", Label: "Budgets", Long: "Monthly Budgets", Icon: "bi-calendar3"),
@@ -37,6 +38,8 @@
                     <span class="brand-mark"><i class="bi bi-piggy-bank-fill"></i></span>
                     <span class="fw-semibold">Family Budget</span>
                 </a>
+                @if (signedIn)
+                {
                 <ul class="navbar-nav ms-auto d-none d-md-flex gap-1">
                     @foreach (var item in nav)
                     {
@@ -50,7 +53,13 @@
                 <a class="btn theme-toggle icon-btn rounded-circle ms-auto ms-md-2 @(controller == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index" title="Settings" aria-label="Settings">
                     <i class="bi bi-gear"></i>
                 </a>
-                <button type="button" class="btn theme-toggle icon-btn rounded-circle ms-2" id="themeToggle" title="Switch between dark and light" aria-label="Switch between dark and light">
+                <form asp-controller="Account" asp-action="Logout" method="post" class="ms-2">
+                    <button class="btn theme-toggle icon-btn rounded-circle" title="Sign out (@User.Identity!.Name)" aria-label="Sign out">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+                }
+                <button type="button" class="btn theme-toggle icon-btn rounded-circle @(signedIn ? "ms-2" : "ms-auto")" id="themeToggle" title="Switch between dark and light" aria-label="Switch between dark and light">
                     <i class="bi bi-sun"></i><i class="bi bi-moon-stars"></i>
                 </button>
             </div>
@@ -82,6 +91,8 @@
     </footer>
 
     <!-- Phone navigation: a tab bar along the bottom of the screen -->
+    @if (signedIn)
+    {
     <nav class="tab-bar d-md-none" aria-label="Main">
         @foreach (var item in nav)
         {
@@ -90,6 +101,7 @@
             </a>
         }
     </nav>
+    }
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

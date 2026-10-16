@@ -30,4 +30,8 @@ public static class QueryExtensions
     /// <summary>Categories in the order the budget sections are shown.</summary>
     public static IQueryable<Category> InDisplayOrder(this IQueryable<Category> categories) =>
         categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name);
+
+    /// <summary>Active bills with an amount owed, for the Debt Payoff page.</summary>
+    public static IQueryable<RecurringDebt> Loans(this IQueryable<RecurringDebt> debts) =>
+        debts.Where(d => d.IsActive && d.Balance > 0).OrderBy(d => d.Id);
 }

@@ -1,10 +1,16 @@
 using BudgetApp.Models;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Data;
 
-public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbContext(options)
+/// <summary>The budget tables, plus the sign-in tables (people who can sign in) and the keys that protect sign-ins.</summary>
+public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
+    : IdentityDbContext<IdentityUser>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
@@ -31,6 +37,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        base.OnModelCreating(b);
         b.Entity<MonthlyBudget>().HasIndex(m => new { m.Year, m.Month }).IsUnique();
         b.Entity<Category>().HasIndex(c => c.Name).IsUnique();
 
