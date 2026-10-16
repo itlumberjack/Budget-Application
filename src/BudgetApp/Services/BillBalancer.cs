@@ -5,7 +5,8 @@ namespace BudgetApp.Services;
 
 /// <summary>
 /// Suggests moving unpaid bills between a month's paydays so each payday has about the same amount left over.
-/// A bill only moves to a payday on or before its due day (or to the first payday), so nothing is paid late.
+/// Only unpaid, flexible bills move, and only to a payday on or before their due day (or to the first payday),
+/// so nothing is paid late and fixed bills like weekly groceries stay on their own payday.
 /// Like the AI helper it only suggests; nothing changes until the user applies the moves.
 /// </summary>
 public static class BillBalancer
@@ -23,7 +24,7 @@ public static class BillBalancer
         var leftOver = columns.Select(c => c.LeftOver).ToArray();
         var original = (decimal[])leftOver.Clone();
         var bills = columns
-            .SelectMany((c, i) => c.Expenses.Where(e => e.Status == PaymentStatus.NotPaid).Select(e => (Bill: e, From: i)))
+            .SelectMany((c, i) => c.Expenses.Where(e => e.Status == PaymentStatus.NotPaid && !e.IsFixed).Select(e => (Bill: e, From: i)))
             .ToList();
         var at = bills.ToDictionary(b => b.Bill.Id, b => b.From);
 
@@ -36,7 +37,7 @@ public static class BillBalancer
                 var from = at[bill.Id];
                 for (var to = 0; to < columns.Count; to++)
                 {
-                    if (to == from || !CanPayFrom(columns[to], to, bill, month)) continue;
+                    if (to == from || !month.CanMoveTo(columns[to], bill)) continue;
                     // Moving amount a from "from" to "to" lowers the spread when "to" has more than a extra left over.
                     var gain = leftOver[to] - leftOver[from] - bill.Amount;
                     if (gain >= MinimumGain && (best is null || bill.Amount * gain > best.Value.Bill.Amount * best.Value.Gain))
@@ -63,17 +64,9 @@ public static class BillBalancer
             .ToList();
 
         var summary = moves.Count == 0
-            ? $"Left over is already as even as it can get without paying a bill late: {Range(original)} per payday."
+            ? $"Left over is already as even as it can get without paying a bill late or moving a fixed bill: {Range(original)} per payday."
             : $"Left over now ranges {Range(original)} per payday. After {(moves.Count == 1 ? "this move" : $"these {moves.Count} moves")} it's {Range(leftOver)}.";
         return new ArrangementSuggestion(summary, moves, ColumnOutcome.For(columns, moves));
-    }
-
-    /// <summary>A bill can come out of a payday on or before its due day. The first payday can pay anything.</summary>
-    private static bool CanPayFrom(PayColumn column, int index, BudgetExpense bill, MonthViewModel month)
-    {
-        if (index == 0 || bill.DueDay is not int day) return true;
-        var due = new DateTime(month.Year, month.Month, Math.Min(day, DateTime.DaysInMonth(month.Year, month.Month)));
-        return column.Paychecks.Min(p => p.PayDate.Date) <= due;
     }
 
     private static string Range(decimal[] values) => $"from {values.Min():C} to {values.Max():C}";

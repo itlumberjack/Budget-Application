@@ -55,6 +55,10 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
         }
         else
         {
+            // Fixed or flexible applies to this month's and later months' copies straight away.
+            var months = db.MonthlyBudgets.FromThisMonth().Select(b => b.Id);
+            await db.BudgetExpenses.Where(e => e.RecurringDebtId == debt.Id && months.Contains(e.MonthlyBudgetId))
+                .ExecuteUpdateAsync(u => u.SetProperty(e => e.IsFixed, debt.IsFixed));
             TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts.";
         }
         return RedirectToAction(nameof(Index));

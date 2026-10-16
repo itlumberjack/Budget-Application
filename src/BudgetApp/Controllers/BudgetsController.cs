@@ -283,7 +283,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> AddExpense(int budgetId, int categoryId, int? payPeriodId, string title, string? company, decimal amount, int? dueDay,
-        PaymentStatus status = PaymentStatus.NotPaid)
+        PaymentStatus status = PaymentStatus.NotPaid, bool isFixed = false)
     {
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
         if (budget is null) return NotFound();
@@ -302,7 +302,8 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
             Company = company.TrimToNull(),
             Amount = amount,
             DueDay = dueDay.ValidDay(),
-            Status = Enum.IsDefined(status) ? status : PaymentStatus.NotPaid
+            Status = Enum.IsDefined(status) ? status : PaymentStatus.NotPaid,
+            IsFixed = isFixed
         });
         await db.SaveChangesAsync();
         return RedirectToMonth(budget);
@@ -310,7 +311,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateExpense(int id, string title, string? company, decimal amount, int? dueDay,
-        int categoryId, int? payPeriodId, PaymentStatus status)
+        int categoryId, int? payPeriodId, PaymentStatus status, bool isFixed)
     {
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).ThenInclude(b => b!.PayPeriods)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -324,6 +325,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, Budget
         if (await db.Categories.AnyAsync(c => c.Id == categoryId)) expense.CategoryId = categoryId;
         expense.PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null;
         if (Enum.IsDefined(status)) expense.Status = status;
+        expense.IsFixed = isFixed;
         await db.SaveChangesAsync();
         return RedirectToMonth(budget);
     }

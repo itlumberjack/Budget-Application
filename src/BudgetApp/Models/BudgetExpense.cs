@@ -34,4 +34,7 @@ public class BudgetExpense
     public RecurringDebt? RecurringDebt { get; set; }
 
     public PaymentStatus Status { get; set; } = PaymentStatus.NotPaid;
+
+    /// <summary>Stays on its payday: Even out and the AI helper leave it where it is.</summary>
+    public bool IsFixed { get; set; }
 }

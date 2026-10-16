@@ -8,7 +8,25 @@ namespace BudgetApp.Services;
 /// <summary>Builds a month's budget from the pay schedules and recurring debts.</summary>
 public class BudgetBuilder(BudgetDbContext db)
 {
-    public async Task<MonthlyBudget> CreateMonthAsync(int year, int month)
+    // Building months is done one request at a time. Otherwise two pages loading at once (the month list and a
+    // month, or a phone and a computer) could both see a month as missing and each add the same bills to it.
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+    private bool _holdingGate;
+
+    private async Task<T> Exclusive<T>(Func<Task<T>> work)
+    {
+        if (_holdingGate) return await work(); // already inside, e.g. creating a month while moving a paycheck
+        await Gate.WaitAsync();
+        _holdingGate = true;
+        try { return await work(); }
+        finally { _holdingGate = false; Gate.Release(); }
+    }
+
+    private async Task Exclusive(Func<Task> work) => await Exclusive(async () => { await work(); return true; });
+
+    public Task<MonthlyBudget> CreateMonthAsync(int year, int month) => Exclusive(() => CreateMonthCoreAsync(year, month));
+
+    private async Task<MonthlyBudget> CreateMonthCoreAsync(int year, int month)
     {
         var budget = await db.MonthlyBudgets.FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
         if (budget is null)
@@ -28,7 +46,9 @@ public class BudgetBuilder(BudgetDbContext db)
     /// Archives months that have ended (unless someone reopened them) and builds any missing budgets from
     /// this month through <see cref="MonthsAhead"/> months ahead. Cheap when there's nothing to do.
     /// </summary>
-    public async Task KeepMonthsCurrentAsync()
+    public Task KeepMonthsCurrentAsync() => Exclusive(() => KeepMonthsCurrentCoreAsync());
+
+    private async Task KeepMonthsCurrentCoreAsync()
     {
         foreach (var ended in await db.MonthlyBudgets.BeforeThisMonth().Where(b => !b.IsArchived && !b.KeepOpen).ToListAsync())
             ended.IsArchived = true;
@@ -47,29 +67,52 @@ public class BudgetBuilder(BudgetDbContext db)
     }
 
     /// <summary>
+    /// Removes extra copies of a recurring bill in this month and later ones: the same bill on the same due day
+    /// more than once, left behind when two pages built a month at the same moment. Copies that are pending,
+    /// complete or changed by hand are kept. Returns how many were removed.
+    /// </summary>
+    public Task<int> RemoveDuplicateBillsAsync() => Exclusive(async () =>
+    {
+        var months = db.MonthlyBudgets.FromThisMonth().Select(b => b.Id);
+        var copies = await db.BudgetExpenses.Include(e => e.RecurringDebt)
+            .Where(e => e.RecurringDebtId != null && months.Contains(e.MonthlyBudgetId))
+            .ToListAsync();
+        var extras = copies
+            .GroupBy(e => (e.MonthlyBudgetId, e.RecurringDebtId, e.DueDay))
+            .SelectMany(g => g.OrderBy(e => e.Status == PaymentStatus.NotPaid).ThenBy(e => e.Id).Skip(1))
+            .Where(e => e.Status == PaymentStatus.NotPaid && e.Amount == e.RecurringDebt!.Amount && e.Title == e.RecurringDebt.Title)
+            .ToList();
+        db.BudgetExpenses.RemoveRange(extras);
+        await db.SaveChangesAsync();
+        return extras.Count;
+    });
+
+    /// <summary>
     /// Adds any paychecks and recurring debts that are missing from the month, and puts any bill
     /// that isn't under a payday yet into one. Never changes amounts or moves bills that already
     /// have a payday, so manual adjustments are kept.
     /// </summary>
-    public async Task<(int paychecks, int debts)> SyncAsync(int budgetId) =>
-        await SyncAsync(budgetId,
+    public Task<(int paychecks, int debts)> SyncAsync(int budgetId) => Exclusive(async () =>
+        await SyncCoreAsync(budgetId,
             await db.IncomeSources.Where(s => s.IsActive).ToListAsync(),
-            await db.RecurringDebts.Where(d => d.IsActive).ToListAsync());
+            await db.RecurringDebts.Where(d => d.IsActive).ToListAsync()));
 
     /// <summary>
     /// Adds a newly created paycheck or bill to the months already built for this month and later,
     /// so it shows up without anyone clicking "Add missing items". Past months are left alone.
     /// </summary>
-    public async Task AddToCurrentAndFutureMonthsAsync(IncomeSource? source = null, RecurringDebt? debt = null)
+    public Task AddToCurrentAndFutureMonthsAsync(IncomeSource? source = null, RecurringDebt? debt = null) => Exclusive(() => AddToCurrentAndFutureMonthsCoreAsync(source, debt));
+
+    private async Task AddToCurrentAndFutureMonthsCoreAsync(IncomeSource? source, RecurringDebt? debt)
     {
         var ids = await db.MonthlyBudgets.FromThisMonth().Select(b => b.Id).ToListAsync();
         foreach (var id in ids)
-            await SyncAsync(id,
+            await SyncCoreAsync(id,
                 source is { IsActive: true } ? [source] : [],
                 debt is { IsActive: true } ? [debt] : []);
     }
 
-    private async Task<(int paychecks, int debts)> SyncAsync(int budgetId, IReadOnlyList<IncomeSource> sources, IReadOnlyList<RecurringDebt> debts)
+    private async Task<(int paychecks, int debts)> SyncCoreAsync(int budgetId, IReadOnlyList<IncomeSource> sources, IReadOnlyList<RecurringDebt> debts)
     {
         var budget = await db.MonthlyBudgets
             .Include(b => b.PayPeriods)
@@ -126,7 +169,8 @@ public class BudgetBuilder(BudgetDbContext db)
                     Company = debt.Company,
                     Amount = debt.Amount,
                     CategoryId = debt.CategoryId,
-                    DueDay = day
+                    DueDay = day,
+                    IsFixed = debt.IsFixed
                 });
                 addedDebts++;
             }
@@ -144,7 +188,9 @@ public class BudgetBuilder(BudgetDbContext db)
     /// month the rules now put them in (bringing their bills along), then fills in any paydays that now
     /// belong to each month. Older months are left as they are.
     /// </summary>
-    public async Task<int> ApplyRulesToCurrentAndFutureMonthsAsync()
+    public Task<int> ApplyRulesToCurrentAndFutureMonthsAsync() => Exclusive(() => ApplyRulesToCurrentAndFutureMonthsCoreAsync());
+
+    private async Task<int> ApplyRulesToCurrentAndFutureMonthsCoreAsync()
     {
         var rules = await db.GetRulesAsync();
         var thisMonth = Dates.ThisMonth;
@@ -178,7 +224,7 @@ public class BudgetBuilder(BudgetDbContext db)
         var activeSources = sources.Values.Where(s => s.IsActive).ToList();
         var activeDebts = await db.RecurringDebts.Where(d => d.IsActive).ToListAsync();
         foreach (var id in ids)
-            await SyncAsync(id, activeSources, activeDebts);
+            await SyncCoreAsync(id, activeSources, activeDebts);
         return moved;
     }
 
@@ -197,7 +243,9 @@ public class BudgetBuilder(BudgetDbContext db)
     /// the unpaid bills due before the next payday. Returns the month it landed in.
     /// A move by hand (<paramref name="manual"/>) is remembered so Brad's rule won't undo it.
     /// </summary>
-    public async Task<MonthlyBudget> MovePaycheckAsync(int payPeriodId, int monthOffset, bool manual = false)
+    public Task<MonthlyBudget> MovePaycheckAsync(int payPeriodId, int monthOffset, bool manual = false) => Exclusive(() => MovePaycheckCoreAsync(payPeriodId, monthOffset, manual));
+
+    private async Task<MonthlyBudget> MovePaycheckCoreAsync(int payPeriodId, int monthOffset, bool manual)
     {
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstAsync(p => p.Id == payPeriodId);
         var from = pay.MonthlyBudget!;
