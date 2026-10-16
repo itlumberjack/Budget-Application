@@ -39,7 +39,13 @@ Out of the box `appsettings.json` has `"Database": { "Provider": "InMemory" }`, 
    GRANT ALL ON budget.* TO 'budget'@'localhost';
    ```
 2. In `src/BudgetApp/appsettings.json`, set `Database:Provider` to `MySql` and put the password in `ConnectionStrings:Budget` (or use the environment variables `Database__Provider` and `ConnectionStrings__Budget`).
-3. Start the app. The tables are created automatically on first start.
+3. Create the tables, either way works:
+   - Start the app (`dotnet run --project src/BudgetApp`). With the provider set to `MySql` it creates or upgrades the tables on startup.
+   - Or, from the repo root, run `dotnet tool restore` and then `dotnet ef database update -p src/BudgetApp`. The `dotnet ef` commands always use MySQL and the `Budget` connection string, even while `Database:Provider` is still `InMemory`.
+
+When the app starts, its log says which database it is using ("Using MySQL database" or "Using in-memory database").
+If it says in-memory when you expected MySQL, check that `appsettings.json` has only one `"Database"` section and that
+`appsettings.Development.json` and the `Database__Provider` environment variable don't set it back.
 
 Data entered in testing mode does not carry over to MySQL.
 
