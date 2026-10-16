@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The budget's models and rules, with no web or database code, so the web app and a phone app can share them. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>BudgetApp</RootNamespace>
+  </PropertyGroup>
+
+</Project>

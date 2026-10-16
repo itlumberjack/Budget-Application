@@ -132,6 +132,12 @@ export Anthropic__ApiKey="<your key>"
 `Anthropic:Model` in appsettings.json picks the model (default `claude-opus-5-5`). Each suggestion
 sends the month's paycheck amounts, bill names and amounts to Anthropic's API.
 
+## Project layout
+
+- `src/BudgetApp`: the website (pages, database, AI helper).
+- `src/BudgetApp.Core`: the shared library. Models, pay schedules, bill frequencies, Even out and the debt planner live here so a phone app can use the same rules.
+- `tests/BudgetApp.Core.Tests`: unit tests for the shared rules. Run them with `dotnet test`.
+
 ## Changing the data model
 
 ```

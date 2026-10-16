@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/BudgetApp.Core/BudgetApp.Core.csproj" />
     <Project Path="src/BudgetApp/BudgetApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BudgetApp.Core.Tests/BudgetApp.Core.Tests.csproj" />
   </Folder>
 </Solution>
