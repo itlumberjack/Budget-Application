@@ -8,11 +8,22 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
+    public DbSet<DebtPlanSettings> DebtPlanSettings => Set<DebtPlanSettings>();
     public DbSet<RecurringDebt> RecurringDebts => Set<RecurringDebt>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
     public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
     public DbSet<PayPeriodExtra> PayPeriodExtras => Set<PayPeriodExtra>();
     public DbSet<BudgetExpense> BudgetExpenses => Set<BudgetExpense>();
+
+    /// <summary>The household's Brad's rule settings (a single row).</summary>
+    public Task<BudgetRules> GetRulesAsync() => SingleRowAsync(BudgetRules);
+
+    /// <summary>The Debt Payoff page's plan (a single row).</summary>
+    public Task<DebtPlanSettings> GetDebtPlanAsync() => SingleRowAsync(DebtPlanSettings);
+
+    /// <summary>Row 1 of a one-row settings table, added if it's missing.</summary>
+    private static async Task<T> SingleRowAsync<T>(DbSet<T> set) where T : class, ISingleRow, new() =>
+        await set.FindAsync(1) ?? set.Add(new T { Id = 1 }).Entity;
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -31,6 +42,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options) : DbCont
         b.Entity<BudgetExpense>().HasOne(e => e.PayPeriod).WithMany().OnDelete(DeleteBehavior.SetNull);
 
         b.Entity<BudgetRules>().HasData(new BudgetRules { Id = 1 });
+        b.Entity<DebtPlanSettings>().HasData(new DebtPlanSettings { Id = 1 });
 
         // Starter categories, matching the sections of the family's budget spreadsheet.
         b.Entity<Category>().HasData(

@@ -39,7 +39,13 @@ Out of the box `appsettings.json` has `"Database": { "Provider": "InMemory" }`, 
    GRANT ALL ON budget.* TO 'budget'@'localhost';
    ```
 2. In `src/BudgetApp/appsettings.json`, set `Database:Provider` to `MySql` and put the password in `ConnectionStrings:Budget` (or use the environment variables `Database__Provider` and `ConnectionStrings__Budget`).
-3. Start the app. The tables are created automatically on first start.
+3. Create the tables, either way works:
+   - Start the app (`dotnet run --project src/BudgetApp`). With the provider set to `MySql` it creates or upgrades the tables on startup.
+   - Or, from the repo root, run `dotnet tool restore` and then `dotnet ef database update -p src/BudgetApp`. The `dotnet ef` commands always use MySQL and the `Budget` connection string, even while `Database:Provider` is still `InMemory`.
+
+When the app starts, its log says which database it is using ("Using MySQL database" or "Using in-memory database").
+If it says in-memory when you expected MySQL, check that `appsettings.json` has only one `"Database"` section and that
+`appsettings.Development.json` and the `Database__Provider` environment variable don't set it back.
 
 Data entered in testing mode does not carry over to MySQL.
 
@@ -49,6 +55,25 @@ On a month page, the first payday column has a left arrow and the last one has a
 arrow moves that payday into the previous month and the right arrow moves it into the next month.
 Bills it was covering move to the month's other paydays. A paycheck moved this way shows a
 ⇄ icon, and Brad's rule leaves it where you put it. Moving it back to its own month clears that.
+
+## Debt payoff
+
+Give a bill on **Recurring Debts** an amount owed and an interest rate (under *Loan or credit card
+details*) and it becomes a loan. Its monthly amount is used as the minimum payment. The **Debt Payoff**
+page then shows:
+
+- Totals: amount owed, minimum payments, average rate (weighted by balance) and this month's interest.
+- A payoff plan modeled on the Vertex42 debt reduction calculator. Pick a strategy (avalanche,
+  snowball, highest balance first, order entered, custom priority, or minimums only), an extra amount
+  each month and an optional one-time payment. It shows the debt-free date, the total interest, and how
+  much interest and time it saves compared with paying only the minimums.
+- A chart of the total owed over time, the payoff order with each debt's payoff month, all strategies
+  side by side, and a month-by-month schedule.
+- A quick form for updating balances from your statements.
+
+Each month, every debt is charged interest (balance × APR ÷ 12) and paid its minimum. The rest of the
+monthly payment (the snowball) goes to the first unpaid debt in the strategy's order. When a debt is
+paid off, its minimum is added to the snowball.
 
 ## AI helper (optional)
 
