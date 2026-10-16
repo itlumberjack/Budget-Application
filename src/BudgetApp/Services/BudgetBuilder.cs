@@ -87,18 +87,24 @@ public class BudgetBuilder(BudgetDbContext db)
         var addedDebts = 0;
         foreach (var debt in debts)
         {
-            if (budget.Expenses.Any(e => e.RecurringDebtId == debt.Id))
-                continue;
-            budget.Expenses.Add(new BudgetExpense
+            // A weekly bill gets one copy per week it's due. Copies already in the month are kept as they are,
+            // so only the missing due days are added (and never more copies than the schedule has).
+            var dueDays = debt.DueDaysIn(budget.Year, budget.Month);
+            var copies = budget.Expenses.Where(e => e.RecurringDebtId == debt.Id).ToList();
+            var missing = dueDays.Where(day => copies.All(e => e.DueDay != day)).Take(dueDays.Count - copies.Count);
+            foreach (var day in missing)
             {
-                RecurringDebtId = debt.Id,
-                Title = debt.Title,
-                Company = debt.Company,
-                Amount = debt.Amount,
-                CategoryId = debt.CategoryId,
-                DueDay = debt.DueDay
-            });
-            addedDebts++;
+                budget.Expenses.Add(new BudgetExpense
+                {
+                    RecurringDebtId = debt.Id,
+                    Title = debt.Title,
+                    Company = debt.Company,
+                    Amount = debt.Amount,
+                    CategoryId = debt.CategoryId,
+                    DueDay = day
+                });
+                addedDebts++;
+            }
         }
 
         foreach (var expense in budget.Expenses.Where(e => e.PayPeriodId is null))

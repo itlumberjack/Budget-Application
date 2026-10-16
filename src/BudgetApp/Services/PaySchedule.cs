@@ -63,17 +63,10 @@ public static class PaySchedule
                 return [new DateTime(year, month, 15), last];
 
             case PayFrequency.Weekly:
+                return Dates.RepeatingInMonth(source.AnchorDate ?? first, 7, year, month);
+
             case PayFrequency.BiWeekly:
-                var step = source.Frequency == PayFrequency.Weekly ? 7 : 14;
-                var anchor = (source.AnchorDate ?? first).Date;
-                // Jump to the first payday on or after the 1st (works for anchors before or after this month).
-                var offset = (first - anchor).Days;
-                var periods = (int)Math.Ceiling(offset / (double)step);
-                var payday = anchor.AddDays(periods * step);
-                var result = new List<DateTime>();
-                for (; payday <= last; payday = payday.AddDays(step))
-                    result.Add(payday);
-                return result;
+                return Dates.RepeatingInMonth(source.AnchorDate ?? first, 14, year, month);
 
             default:
                 return [];

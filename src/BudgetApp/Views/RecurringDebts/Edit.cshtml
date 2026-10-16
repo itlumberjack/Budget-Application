@@ -21,12 +21,12 @@
         <span asp-validation-for="Company" class="text-danger"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="Amount" class="form-label"></label>
+        <label asp-for="Amount" class="form-label">Amount each time</label>
         <div class="input-group">
             <span class="input-group-text">$</span>
             <input asp-for="Amount" class="form-control" step="0.01" type="number" inputmode="decimal" />
         </div>
-        <div class="form-text">What you pay each month. For a loan or card, the minimum payment.</div>
+        <div class="form-text">What you pay each time it's due. For a loan or card, the minimum payment.</div>
         <span asp-validation-for="Amount" class="text-danger"></span>
     </div>
     <div class="mb-3">
@@ -35,10 +35,20 @@
         <div class="form-text">Need a new one? Add it on <a asp-controller="Categories" asp-action="Index">Categories</a>.</div>
     </div>
     <div class="mb-3">
+        <label asp-for="Frequency" class="form-label"></label>
+        <select asp-for="Frequency" asp-items="Html.GetEnumSelectList<BillFrequency>()" class="form-select" id="billFrequency"></select>
+    </div>
+    <div class="mb-3" id="dueDayGroup">
         <label asp-for="DueDay" class="form-label"></label>
         <input asp-for="DueDay" class="form-control" placeholder="Optional, 1 to 31" />
         <div class="form-text">Used to place the bill under the last paycheck before it's due. Without one, it goes under the month's first paycheck.</div>
         <span asp-validation-for="DueDay" class="text-danger"></span>
+    </div>
+    <div class="mb-3" id="startDateGroup">
+        <label asp-for="StartDate" class="form-label"></label>
+        <input asp-for="StartDate" type="date" class="form-control" />
+        <div class="form-text">Any date it's due, like this Friday. Each month gets a copy for every week (or every other week) from then on.</div>
+        <span asp-validation-for="StartDate" class="text-danger"></span>
     </div>
     <details class="loan-details mb-3" @(Model.Balance is not null ? "open" : "")>
         <summary class="fw-semibold"><i class="bi bi-bank me-1"></i> Loan or credit card details</summary>
@@ -89,4 +99,16 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // A monthly bill has a due day; a weekly or every-two-weeks bill has a first due date instead.
+        const billFrequency = document.getElementById('billFrequency');
+        const showSchedule = () => {
+            const monthly = billFrequency.value === '0';
+            document.getElementById('dueDayGroup').style.display = monthly ? '' : 'none';
+            document.getElementById('startDateGroup').style.display = monthly ? 'none' : '';
+            document.getElementById('StartDate').required = !monthly;
+        };
+        billFrequency.addEventListener('change', showSchedule);
+        showSchedule();
+    </script>
 }

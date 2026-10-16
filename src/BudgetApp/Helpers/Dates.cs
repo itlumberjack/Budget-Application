@@ -33,4 +33,19 @@ public static class Dates
         3 => "rd",
         _ => "th"
     });
+
+    /// <summary>
+    /// Every date in the month that falls a whole number of <paramref name="stepDays"/> from
+    /// <paramref name="anchor"/> (counting forward or back), e.g. every other Friday.
+    /// </summary>
+    public static IReadOnlyList<DateTime> RepeatingInMonth(DateTime anchor, int stepDays, int year, int month)
+    {
+        var first = new DateTime(year, month, 1);
+        var last = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+        var periods = (int)Math.Ceiling((first - anchor.Date).Days / (double)stepDays);
+        var result = new List<DateTime>();
+        for (var day = anchor.Date.AddDays(periods * stepDays); day <= last; day = day.AddDays(stepDays))
+            result.Add(day);
+        return result;
+    }
 }

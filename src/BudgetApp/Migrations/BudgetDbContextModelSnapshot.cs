@@ -388,6 +388,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("InterestRate")
                         .HasColumnType("decimal(6,3)");
 
@@ -396,6 +399,9 @@ namespace BudgetApp.Migrations
 
                     b.Property<int?>("PayoffPriority")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Title")
                         .IsRequired()

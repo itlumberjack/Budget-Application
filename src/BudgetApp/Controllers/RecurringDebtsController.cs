@@ -32,6 +32,11 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(RecurringDebt debt)
     {
+        if (debt.Frequency != BillFrequency.Monthly && debt.StartDate is null)
+            ModelState.AddModelError(nameof(debt.StartDate), "Pick any date this bill is due so the app can work out the rest.");
+        // Each schedule uses one of the two: a day of the month, or a first due date to count weeks from.
+        if (debt.Frequency == BillFrequency.Monthly) debt.StartDate = null;
+        else debt.DueDay = null;
         if (!ModelState.IsValid)
         {
             await LoadCategoriesAsync();
