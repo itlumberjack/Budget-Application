@@ -286,6 +286,12 @@ namespace BudgetApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("KeepOpen")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("Month")
                         .HasColumnType("int");
 

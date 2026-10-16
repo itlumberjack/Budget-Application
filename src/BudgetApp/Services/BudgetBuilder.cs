@@ -21,6 +21,31 @@ public class BudgetBuilder(BudgetDbContext db)
         return budget;
     }
 
+    /// <summary>How many months past this one always have a budget ready.</summary>
+    public const int MonthsAhead = 6;
+
+    /// <summary>
+    /// Archives months that have ended (unless someone reopened them) and builds any missing budgets from
+    /// this month through <see cref="MonthsAhead"/> months ahead. Cheap when there's nothing to do.
+    /// </summary>
+    public async Task KeepMonthsCurrentAsync()
+    {
+        foreach (var ended in await db.MonthlyBudgets.BeforeThisMonth().Where(b => !b.IsArchived && !b.KeepOpen).ToListAsync())
+            ended.IsArchived = true;
+        await db.SaveChangesAsync();
+
+        if (!await db.IncomeSources.AnyAsync(s => s.IsActive) && !await db.RecurringDebts.AnyAsync(d => d.IsActive))
+            return;
+        var built = (await db.MonthlyBudgets.FromThisMonth().Select(b => new { b.Year, b.Month }).ToListAsync())
+            .Select(b => (b.Year, b.Month)).ToHashSet();
+        for (var i = 0; i <= MonthsAhead; i++)
+        {
+            var month = Dates.ThisMonth.AddMonths(i);
+            if (!built.Contains((month.Year, month.Month)))
+                await CreateMonthAsync(month.Year, month.Month);
+        }
+    }
+
     /// <summary>
     /// Adds any paychecks and recurring debts that are missing from the month, and puts any bill
     /// that isn't under a payday yet into one. Never changes amounts or moves bills that already

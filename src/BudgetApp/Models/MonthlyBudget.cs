@@ -14,6 +14,12 @@ public class MonthlyBudget
     [StringLength(1000)]
     public string? Notes { get; set; }
 
+    /// <summary>A month that's over is archived: hidden from the main list and read-only.</summary>
+    public bool IsArchived { get; set; }
+
+    /// <summary>Set when someone unarchives a past month, so it isn't archived again automatically.</summary>
+    public bool KeepOpen { get; set; }
+
     public List<PayPeriod> PayPeriods { get; set; } = new();
     public List<BudgetExpense> Expenses { get; set; } = new();
 
