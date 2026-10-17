@@ -52,6 +52,15 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Check stubs
+
+Each paycheck on Pay & Schedule (and its edit page) has *Read a check stub*. Pick a PDF or photo of a recent stub
+and the AI helper breaks it down: gross pay, earnings lines, before-tax deductions, taxes, after-tax deductions
+and take-home pay, with year-to-date amounts. A warning shows if the lines don't add up to the take-home pay.
+You can make the stub's take-home the paycheck's amount, and by default its upcoming paydays in months already
+built change too (paydays before today keep theirs). The breakdown stays on the paycheck's card; the file
+itself isn't stored. Uses the same `Anthropic:ApiKey` as the AI helper.
+
 ## Weekly bills, six months ahead, and the archive
 
 - A recurring bill can be **monthly** (with a due day), **weekly** or **every two weeks**. For the last two,
@@ -160,7 +169,13 @@ that have already passed are skipped.
 
 Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid
 shares again. Shares marked pending or complete are kept and count toward that month's total. You can change a
-share's amount on the month page. The Debt Payoff page lists this month's shares under *Extra by payday*.
+share's amount on the month page, or remove it: the month's other paydays make up the difference so the month
+still pays the extra set on Debt Payoff, and the changed payday keeps its amount when the extra is spread again.
+Turn on *Also change later months* in that dialog to make the month's new total the monthly extra instead.
+
+The snowball goes to one loan at a time: all the extra goes to the first loan in the strategy's order, and moves
+on only once it's paid off (the rest of that month's extra goes to the next loan). A loan with a promo the plan
+would otherwise miss moves to the front of the line. The Debt Payoff page lists this month's shares under *Extra by payday*.
 
 Next to each loan payment and extra share on a month page is what's left on that loan after it ("$250 left",
 or "paid off"), counting that month's payments in payday order. This month starts from the amount owed on
@@ -174,8 +189,8 @@ one monthly payment when the site starts.
 
 A loan can have a promo: a rate (often 0%), an end date, an optional promo balance (blank means all of it),
 and whether it is *deferred interest* (miss the date and the interest from the start is charged back). The
-payoff plan charges the promo rate on that part and puts extra on each promo first, soonest end date first, so
-it is paid off before the promo ends. Payments are assumed to come off the regular part first. *Promo
+payoff plan charges the promo rate on that part, and if the strategy's order wouldn't clear the promo before it
+ends, that loan moves to the front of the snowball (soonest end date first). Payments are assumed to come off the regular part first. *Promo
 deadlines* on Debt Payoff says the month each promo is cleared, or how much is left at the end, the monthly
 amount it would take, and any deferred interest that would be charged. A promo stops counting once its date
 passes.
@@ -184,6 +199,17 @@ On a loan's page, *Read a statement* takes a PDF or photo (JPG, PNG, WEBP or GIF
 reads the amount owed, APR, minimum payment and any promos. You review it next to the loan's current numbers
 and pick what to save and which promo to plan around. The file is sent to the AI and not stored. This uses the
 same `Anthropic:ApiKey` as the AI helper.
+
+### What If
+
+*What If* on Debt Payoff takes a question in plain words, such as "what if I refinance my HELOC at 7% and roll all
+my other debt into it?", and compares the answer with your plan: total interest, debt-free date and what you pay
+each month, with the loans before and after. The AI helper only turns the question into changes (new rates,
+loans rolled together, a fee or term, more extra, a lump sum); the payoff math is the same as the plan's. When a
+loan is rolled in, its payment stays what the old payments added up to unless the question gives a term or
+payment. If the payments go down, it also shows what happens if you keep paying what you pay now. Questions are
+kept on the What If page and worked out again with your latest balances when you open one. Nothing on your plan
+changes.
 
 ## AI helper (optional)
 

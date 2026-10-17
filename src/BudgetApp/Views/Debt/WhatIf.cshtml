@@ -1,0 +1,145 @@
+@model BudgetApp.Services.WhatIfResult?
+@{
+    ViewData["Title"] = "What If";
+    var questions = (List<WhatIfQuestion>)ViewBag.Questions;
+    var asked = (WhatIfQuestion?)ViewBag.Question;
+    string DebtFree(PayoffPlan p) => p.PaysOff && p.Schedule.Count > 0 ? p.Schedule[^1].Month.ToString("MMMM yyyy") : "not within 50 years";
+    string Months(int n) => n == 1 ? "1 month" : $"{n} months";
+    string Compare(PayoffPlan before, PayoffPlan after)
+    {
+        var saved = before.TotalInterest - after.TotalInterest;
+        var sooner = before.Schedule.Count - after.Schedule.Count;
+        var money = saved >= 0 ? $"save about {saved:C0} in interest" : $"pay about {-saved:C0} more in interest";
+        var when = !after.PaysOff ? "never be debt-free at this rate"
+            : sooner > 0 ? $"be debt-free in {DebtFree(after)}, {Months(sooner)} sooner"
+            : sooner < 0 ? $"be debt-free in {DebtFree(after)}, {Months(-sooner)} later"
+            : $"be debt-free the same month ({DebtFree(after)})";
+        return $"You'd {money} and {when}.";
+    }
+    var examples = new[]
+    {
+        "What if I refinance my HELOC at 7% and roll all my other debt into it?",
+        "What if I put an extra $300 a month toward debt?",
+        "What if I pay off the smallest card with a $2,000 bonus in March?",
+        "What if I move the highest-rate card to a 0% balance transfer for 18 months with a 3% fee?"
+    };
+}
+
+<a asp-action="Index" class="small text-decoration-none"><i class="bi bi-chevron-left"></i> Debt Payoff</a>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3 mt-1">
+    <div>
+        <h1 class="mb-1">What If</h1>
+        <p class="page-subtitle mb-0">Ask about a change to your debt and see how it compares with your plan today.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+<div class="col-lg-8">
+    <form asp-action="AskWhatIf" method="post" class="card mb-3" id="whatIfForm"><div class="card-body">
+        <label for="question" class="form-label fw-medium">Your question</label>
+        <textarea class="form-control mb-2" id="question" name="question" rows="2" maxlength="1000" required
+                  placeholder="What if I refinance my HELOC at 7% and consolidate all my other debt into it?">@TempData["WhatIfQuestion"]</textarea>
+        <div class="d-flex flex-wrap gap-1 mb-2">
+            @foreach (var e in examples)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill whatif-example" onclick="document.getElementById('question').value = this.textContent.trim()">@e</button>
+            }
+        </div>
+        <button class="btn btn-ai"><i class="bi bi-stars me-1"></i> Work it out</button>
+        <span class="small text-muted ms-2 d-none" id="whatIfBusy"><span class="spinner-border spinner-border-sm me-1"></span> Working it out…</span>
+    </div></form>
+
+    @if (Model is not null && asked is not null)
+    {
+        var r = Model;
+        <div class="card mb-3" id="whatIfAnswer"><div class="card-body">
+            <div class="small text-muted mb-1"><i class="bi bi-chat-left-quote me-1"></i>@asked.Question</div>
+            <h2 class="h5 mb-2">@asked.Title</h2>
+            <p class="fs-5 mb-3" id="whatIfHeadline">@Compare(r.Before, r.After)</p>
+
+            <div class="row g-2 mb-3 text-center" id="whatIfStats">
+                <div class="col-sm-4"><div class="border rounded p-2 h-100">
+                    <div class="small text-muted">Total interest</div>
+                    <div class="fw-semibold money">@r.After.TotalInterest.ToString("C0")</div>
+                    <div class="small text-muted">now @r.Before.TotalInterest.ToString("C0")</div>
+                </div></div>
+                <div class="col-sm-4"><div class="border rounded p-2 h-100">
+                    <div class="small text-muted">Debt-free</div>
+                    <div class="fw-semibold">@DebtFree(r.After)</div>
+                    <div class="small text-muted">now @DebtFree(r.Before)</div>
+                </div></div>
+                <div class="col-sm-4"><div class="border rounded p-2 h-100">
+                    <div class="small text-muted">Paid each month</div>
+                    <div class="fw-semibold money">@r.After.MonthlyPayment.ToString("C")</div>
+                    <div class="small text-muted">now @r.Before.MonthlyPayment.ToString("C")</div>
+                </div></div>
+            </div>
+
+            @if (r.AfterSamePayment is { } same)
+            {
+                <div class="alert alert-success small" id="whatIfSamePayment"><i class="bi bi-lightbulb me-1"></i>
+                    The payments drop by @((r.MinimumsBefore - r.MinimumsAfter).ToString("C")) a month. If you keep paying @same.MonthlyPayment.ToString("C") and put the difference toward the snowball: @Compare(r.Before, same)</div>
+            }
+
+            <h3 class="h6 mt-3">Loans</h3>
+            <div class="table-responsive"><table class="table table-sm align-middle" id="whatIfLoans">
+                <thead><tr><th>Loan</th><th class="text-end">Owed</th><th class="text-end">Rate</th><th class="text-end">Payment</th></tr></thead>
+                <tbody>
+                    @foreach (var b in r.BeforeDebts)
+                    {
+                        var a = r.AfterDebts.FirstOrDefault(x => x.Id == b.Id);
+                        <tr class="@(a is null ? "text-muted" : "")">
+                            <td>@b.Name @if (a is null) { <span class="badge text-bg-secondary">@(r.Scenario.LoanChanges.Any(c => c.LoanId == b.Id && c.PaidOff) ? "paid off" : "rolled in")</span> }</td>
+                            <td class="text-end money">@if (a is not null && a.Balance != b.Balance) { <s class="text-muted">@b.Balance.ToString("C0")</s> } @((a ?? b).Balance.ToString("C0"))</td>
+                            <td class="text-end">@if (a is not null && a.Apr != b.Apr) { <s class="text-muted">@b.Apr.ToString("0.##")%</s> } @((a ?? b).Apr.ToString("0.##"))%</td>
+                            <td class="text-end money">@if (a is not null && a.MinPayment != b.MinPayment) { <s class="text-muted">@b.MinPayment.ToString("C")</s> } @((a ?? b).MinPayment.ToString("C"))</td>
+                        </tr>
+                    }
+                    @foreach (var a in r.AfterDebts.Where(a => r.BeforeDebts.All(b => b.Id != a.Id)))
+                    {
+                        <tr><td>@a.Name <span class="badge bg-brand-soft text-brand">new</span></td><td class="text-end money">@a.Balance.ToString("C0")</td>
+                            <td class="text-end">@a.Apr.ToString("0.##")%</td><td class="text-end money">@a.MinPayment.ToString("C")</td></tr>
+                    }
+                </tbody>
+            </table></div>
+
+            @{ var notes = r.Notes.Concat(r.Scenario.Assumptions).ToList(); }
+            @if (r.Scenario.ExtraMonthly is decimal x) { notes.Add($"Extra each month: {x:C}."); }
+            @if (r.Scenario.Strategy is PayoffStrategy st) { notes.Add($"Payoff order: {st.DisplayName()}."); }
+            @if (r.Scenario.OneTimeAmount is decimal ot) { notes.Add($"One-time payment of {ot:C}" + (r.Scenario.OneTimeMonth is DateTime om ? $" in {om:MMMM yyyy}." : ".")); }
+            @if (notes.Count > 0)
+            {
+                <h3 class="h6">How it was worked out</h3>
+                <ul class="small mb-0" id="whatIfNotes">@foreach (var n in notes) { <li>@n</li> }</ul>
+            }
+            @if (r.Scenario.Unsupported is string u) { <p class="small text-warning mt-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Left out: @u</p> }
+            <p class="small text-muted mt-2 mb-0">Uses today's balances and your current plan (@r.Before.Strategy.DisplayName(), @Model.Before.MonthlyPayment.ToString("C") a month), starting next month. Nothing on your plan changes.</p>
+        </div></div>
+    }
+</div>
+<div class="col-lg-4">
+    <div class="card" id="whatIfList">
+        <div class="card-header">Questions asked</div>
+        @if (questions.Count == 0)
+        {
+            <div class="card-body small text-muted">None yet. Each question is kept here and worked out again with your latest balances when you open it.</div>
+        }
+        <ul class="list-group list-group-flush">
+            @foreach (var q in questions)
+            {
+                <li class="list-group-item d-flex gap-2 align-items-start @(q.Id == asked?.Id ? "active-soft" : "")">
+                    <a asp-action="WhatIf" asp-route-id="@q.Id" class="flex-grow-1 text-decoration-none">
+                        <div class="fw-medium">@q.Title</div><div class="small text-muted">@q.AskedAt.ToString("MMM d")</div></a>
+                    <form asp-action="DeleteWhatIf" asp-route-id="@q.Id" method="post"><button class="btn btn-sm btn-link text-danger p-0" title="Delete"><i class="bi bi-x-lg"></i></button></form>
+                </li>
+            }
+        </ul>
+    </div>
+</div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('whatIfForm').addEventListener('submit', () => document.getElementById('whatIfBusy').classList.remove('d-none'));
+    </script>
+}

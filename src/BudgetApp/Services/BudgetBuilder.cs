@@ -258,8 +258,8 @@ public class BudgetBuilder(BudgetDbContext db)
     /// Spreads the Debt Payoff page's extra monthly payment (plus any one-time extra that month) over the
     /// paydays of this month and later ones, or just one month. Paydays with more left over give more, so they
     /// end up about even, and each share goes to the loans in the payoff strategy's order using their projected
-    /// balances. Shares already marked pending or complete are kept and count toward the month's total; the
-    /// rest are redone. In this month, paydays that have already passed are skipped while a later one is left.
+    /// balances. Shares already marked pending or complete, or set by hand, are kept and count toward the month's
+    /// total; the rest are redone over the other paydays. In this month, paydays that have already passed are skipped while a later one is left.
     /// </summary>
     public Task SpreadDebtExtraAsync(int? budgetId = null, (int Year, int Month)? after = null) => Exclusive(async () =>
     {
@@ -274,7 +274,9 @@ public class BudgetBuilder(BudgetDbContext db)
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).ThenInclude(p => p.Extras).Include(b => b.Expenses)
             .FirstAsync(b => b.Id == budgetId);
         if (budget.IsArchived) return;
-        db.BudgetExpenses.RemoveRange(budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status == PaymentStatus.NotPaid));
+        // Shares that are paid, pending or set by hand stay as they are and count toward the month's total.
+        var kept = budget.Expenses.Where(e => e.ExtraForDebtId != null && (e.Status != PaymentStatus.NotPaid || e.ExtraPinned)).ToList();
+        db.BudgetExpenses.RemoveRange(budget.Expenses.Where(e => e.ExtraForDebtId != null && !kept.Contains(e)).ToList());
         await db.SaveChangesAsync();
 
         var settings = await db.GetDebtPlanAsync();
@@ -282,14 +284,13 @@ public class BudgetBuilder(BudgetDbContext db)
         var first = Dates.ThisMonth;
         if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly || budget.FirstDay < first) return;
         var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
-        var total = settings.ExtraMonthly + oneTime
-            - budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid).Sum(e => e.Amount);
+        var total = settings.ExtraMonthly + oneTime - kept.Sum(e => e.Amount);
         if (total <= 0) return;
 
         // Each loan's balance at the start of this month, as the payoff plan projects it from today's balances.
         var inputs = loans.Select(d => d.ToDebtInput()).ToList();
         var startBalances = DebtPlanner.StartBalances(inputs, settings, first, budget.Year, budget.Month);
-        var paidExtra = budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid)
+        var paidExtra = kept
             .GroupBy(e => e.ExtraForDebtId!.Value).ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
         // First the loans the payoff plan sends extra to this month (a promo that has to be cleared in time comes
         // first), up to what the plan gives each; then the strategy's order, up to what each loan still owes.
@@ -297,7 +298,7 @@ public class BudgetBuilder(BudgetDbContext db)
         var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.ExtraMonthly, first, settings.OneTimeAmount, settings.OneTimeMonth);
         var planned = monthIndex < plan.Schedule.Count ? plan.Schedule[monthIndex].Extra : new Dictionary<int, decimal>();
         var targets = planned.Select(x => (Id: x.Key, Capacity: Math.Max(0, x.Value - paidExtra.GetValueOrDefault(x.Key)))).ToList();
-        targets.AddRange(DebtPlanner.Order(inputs, settings.Strategy).Select(d => (d.Id, Capacity: Math.Max(0,
+        targets.AddRange(plan.Debts.Select(o => o.Debt).Select(d => (d.Id, Capacity: Math.Max(0,
             startBalances.GetValueOrDefault(d.Id) - d.MinPayment - paidExtra.GetValueOrDefault(d.Id) - planned.GetValueOrDefault(d.Id)))));
         targets = targets.Where(t => t.Capacity > 0).ToList();
         if (targets.Count == 0) return;
@@ -306,6 +307,9 @@ public class BudgetBuilder(BudgetDbContext db)
         var columns = view.Columns.Where(c => !c.IsUnassigned).ToList();
         if (budget.FirstDay == first && columns.Any(c => c.Paychecks.Max(p => p.PayDate.Date) >= DateTime.Today))
             columns = columns.Where(c => c.Paychecks.Max(p => p.PayDate.Date) >= DateTime.Today).ToList();
+        // A payday whose share was set by hand keeps just that; the other paydays make up the rest.
+        var pinned = kept.Where(e => e.ExtraPinned).Select(e => e.PayPeriodId).ToHashSet();
+        columns = columns.Where(c => !c.Paychecks.Any(p => pinned.Contains(p.Id))).ToList();
         if (columns.Count == 0) return;
 
         var shares = DebtExtraSplitter.Spread(columns.Select(c => c.LeftOver).ToList(), total);

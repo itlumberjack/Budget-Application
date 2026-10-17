@@ -25,14 +25,38 @@ public class PromoTests
     }
 
     [Fact]
-    public void Promo_deadline_comes_before_the_strategy_order()
+    public void A_promo_that_would_be_missed_moves_to_the_front_of_the_line()
     {
-        // Avalanche would put all the extra on the 29.9% car loan; the promo card still gets what it needs first.
+        // Avalanche would put all the extra on the 29.9% car loan and miss the promo; the card goes first instead,
+        // and it alone gets the extra until it's paid off.
         var plan = DebtPlanner.Plan([Card(), CarLoan()], PayoffStrategy.Avalanche, 300, Start);
         Assert.True(plan.Promos.Single().ClearsInTime);
-        Assert.Equal(175m, plan.Schedule[0].Extra[1]); // 200 a month needed, 25 of it is the minimum
-        Assert.Equal(125m, plan.Schedule[0].Extra[2]);
-        Assert.Equal([1, 2], plan.Schedule[0].Extra.Keys);
+        Assert.Equal([1], plan.Schedule[0].Extra.Keys);
+        Assert.Equal(300m, plan.Schedule[0].Extra[1]);
+        Assert.Equal(1, plan.Debts[0].Debt.Id);
+    }
+
+    [Fact]
+    public void A_promo_cleared_in_time_anyway_keeps_its_place()
+    {
+        // A promo ending far out clears after the car loan, so the strategy's order stands.
+        var card = Card() with { Promo = new PromoTerms(0, null, new DateTime(2030, 1, 1), false) };
+        var plan = DebtPlanner.Plan([card, CarLoan()], PayoffStrategy.Avalanche, 300, Start);
+        Assert.True(plan.Promos.Single().ClearsInTime);
+        Assert.Equal([2], plan.Schedule[0].Extra.Keys);
+    }
+
+    [Fact]
+    public void The_snowball_goes_to_one_loan_at_a_time()
+    {
+        var small = new DebtInput(1, "Small", 500, 20, 25, null);
+        var plan = DebtPlanner.Plan([small, CarLoan()], PayoffStrategy.Snowball, 200, Start);
+        Assert.Equal([1], plan.Schedule[0].Extra.Keys);
+        Assert.Equal([1], plan.Schedule[1].Extra.Keys);
+        // The month the small loan is paid off, the rest of the extra moves on to the car loan.
+        var payoff = plan.Debts.First(d => d.Debt.Id == 1).PayoffMonth!.Value;
+        Assert.Equal([1, 2], plan.Schedule[payoff - 1].Extra.Keys);
+        Assert.Equal([2], plan.Schedule[payoff].Extra.Keys);
     }
 
     [Fact]

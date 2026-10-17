@@ -23,10 +23,39 @@ public static class DebtPlanner
         _ => debts.OrderBy(d => d.Id).ToList() // order entered
     };
 
+    /// <summary>
+    /// The payoff plan. The snowball goes to one loan at a time, in the strategy's order, and moves on only once
+    /// that loan is paid off. A loan with a promo the plan wouldn't clear before it ends moves to the front of
+    /// the line (soonest-ending promo first), so the extra clears it in time if it can.
+    /// </summary>
     public static PayoffPlan Plan(IReadOnlyList<DebtInput> debts, PayoffStrategy strategy, decimal extraMonthly,
         DateTime firstMonth, decimal oneTimeAmount = 0, DateTime? oneTimeMonth = null)
     {
-        var ordered = Order(debts, strategy);
+        var order = Order(debts, strategy);
+        var plan = Simulate(debts, order, strategy, extraMonthly, firstMonth, oneTimeAmount, oneTimeMonth);
+        if (strategy == PayoffStrategy.MinimumOnly) return plan;
+        var first = new List<int>();
+        var skipped = new HashSet<int>();
+        int Cleared(PayoffPlan x) => x.Promos.Count(p => p.ClearsInTime);
+        while (plan.Promos.Where(p => !p.ClearsInTime && !first.Contains(p.DebtId) && !skipped.Contains(p.DebtId))
+                   .OrderBy(p => p.EndDate).FirstOrDefault() is { } missed)
+        {
+            var tryFirst = first.Append(missed.DebtId).ToList();
+            var promoted = tryFirst.Select(id => order.First(d => d.Id == id)).OrderBy(d => d.Promo!.EndDate).ToList();
+            var tried = Simulate(debts, promoted.Concat(order.Where(d => !tryFirst.Contains(d.Id))).ToList(), strategy,
+                extraMonthly, firstMonth, oneTimeAmount, oneTimeMonth);
+            // Keep the new order only if it clears more promos in time (or as many for less interest).
+            if (Cleared(tried) > Cleared(plan) || (Cleared(tried) == Cleared(plan) && tried.TotalInterest < plan.TotalInterest))
+                (plan, first) = (tried, tryFirst);
+            else
+                skipped.Add(missed.DebtId);
+        }
+        return plan;
+    }
+
+    private static PayoffPlan Simulate(IReadOnlyList<DebtInput> debts, List<DebtInput> ordered, PayoffStrategy strategy,
+        decimal extraMonthly, DateTime firstMonth, decimal oneTimeAmount, DateTime? oneTimeMonth)
+    {
         var snowballOn = strategy != PayoffStrategy.MinimumOnly;
         var monthlyPayment = debts.Sum(d => d.MinPayment) + (snowballOn ? Math.Max(0, extraMonthly) : 0);
 
@@ -92,17 +121,6 @@ public static class DebtPlanner
             var snowball = 0m;
             if (snowballOn)
             {
-                // First, enough to clear each promo balance by the time its promo ends (soonest deadline first).
-                foreach (var d in open.Where(d => promos.ContainsKey(d.Id) && promoLeft[d.Id] > 0 && MonthsLeft(promos[d.Id], month) >= 1)
-                             .OrderBy(d => promos[d.Id].EndDate))
-                {
-                    if (pool <= 0) break;
-                    var owedThisMonth = balance[d.Id] + payments[d.Id]; // before this month's minimum
-                    var needed = Math.Ceiling(owedThisMonth / MonthsLeft(promos[d.Id], month) * 100) / 100 - payments[d.Id];
-                    var pay = Math.Min(pool, Math.Min(Math.Max(0, needed), balance[d.Id]));
-                    Pay(d, pay, true);
-                    snowball += pay;
-                }
                 foreach (var d in open)
                 {
                     if (pool <= 0) break;

@@ -58,6 +58,8 @@ builder.Services.AddScoped<MonthService>();
 builder.Services.AddHttpClient<ClaudeApi>(c => c.Timeout = TimeSpan.FromMinutes(3));
 builder.Services.AddScoped<BudgetAdvisor>();
 builder.Services.AddScoped<StatementReader>();
+builder.Services.AddScoped<StubReader>();
+builder.Services.AddScoped<WhatIfAdvisor>();
 
 var app = builder.Build();
 

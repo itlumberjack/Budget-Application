@@ -1,0 +1,8 @@
+@model IncomeSource
+@* A "Read a check stub" button: picking a file sends it straight to the AI helper. *@
+<form asp-controller="Income" asp-action="ReadStub" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="stub-form d-inline">
+    <input type="hidden" name="returnTo" value="@ViewData["StubReturnTo"]" />
+    <input type="file" name="stub" class="d-none" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif" onchange="if (this.files.length) { this.form.querySelector('.stub-busy').classList.remove('d-none'); this.form.submit(); }" />
+    <button type="button" class="btn btn-sm btn-ai" onclick="this.form.querySelector('input[type=file]').click()"><i class="bi bi-receipt me-1"></i> Read a check stub</button>
+    <span class="stub-busy small text-muted ms-1 d-none"><span class="spinner-border spinner-border-sm me-1"></span> Reading…</span>
+</form>
