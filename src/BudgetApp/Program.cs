@@ -70,6 +70,7 @@ using (var scope = app.Services.CreateScope())
     var monthBuilder = scope.ServiceProvider.GetRequiredService<BudgetBuilder>();
     await monthBuilder.RemoveDuplicateBillsAsync();
     await monthBuilder.RedateMonthEndPaychecksAsync();
+    await monthBuilder.UndoLoanPaymentScheduleAsync();
     await monthBuilder.KeepMonthsCurrentAsync();
 }
 

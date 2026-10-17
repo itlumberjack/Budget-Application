@@ -38,6 +38,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ExtraForDebtId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsFixed")
                         .HasColumnType("tinyint(1)");
 
@@ -64,6 +67,8 @@ namespace BudgetApp.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("ExtraForDebtId");
 
                     b.HasIndex("MonthlyBudgetId");
 
@@ -674,6 +679,11 @@ namespace BudgetApp.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("BudgetApp.Models.RecurringDebt", "ExtraForDebt")
+                        .WithMany()
+                        .HasForeignKey("ExtraForDebtId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("BudgetApp.Models.MonthlyBudget", "MonthlyBudget")
                         .WithMany("Expenses")
                         .HasForeignKey("MonthlyBudgetId")
@@ -691,6 +701,8 @@ namespace BudgetApp.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Category");
+
+                    b.Navigation("ExtraForDebt");
 
                     b.Navigation("MonthlyBudget");
 

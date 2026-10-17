@@ -49,15 +49,4 @@ public class LoanScheduleTests
         Assert.Equal(BillFrequency.Monthly, loan.Frequency);
         Assert.Equal([25], loan.DueDaysIn(2026, 10));
     }
-
-    [Fact]
-    public void Paying_every_two_weeks_clears_the_loan_sooner_than_monthly()
-    {
-        var loan = CarLoan();
-        loan.ChangePaymentSchedule(BillFrequency.BiWeekly, new DateTime(2026, 10, 9));
-        var model = DebtPageModel.Build([loan], new DebtPlanSettings { Strategy = PayoffStrategy.Avalanche });
-        Assert.NotNull(model.PaidMonthly);
-        Assert.True(model.Plan!.Months < model.PaidMonthly!.Months);
-        Assert.True(model.Plan.TotalInterest < model.PaidMonthly.TotalInterest);
-    }
 }

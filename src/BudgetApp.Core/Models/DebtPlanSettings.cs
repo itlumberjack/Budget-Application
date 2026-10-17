@@ -18,11 +18,10 @@ public class DebtPlanSettings : ISingleRow
     public DateTime? OneTimeMonth { get; set; }
 
     /// <summary>
-    /// How often loans are paid. Every two weeks pays half the monthly payment each time, and weekly a quarter,
-    /// which adds up to 13 monthly payments a year. Each loan on Bills &amp; Expenses follows this schedule.
+    /// No longer offered: loans used to be payable weekly or every two weeks. Kept so a schedule picked back then
+    /// can be undone at startup (BudgetBuilder.UndoLoanPaymentScheduleAsync).
     /// </summary>
     public BillFrequency PaymentFrequency { get; set; } = BillFrequency.Monthly;
 
-    /// <summary>The first weekly or every-two-weeks payment; later ones are counted from it.</summary>
     public DateTime? PaymentStartDate { get; set; }
 }

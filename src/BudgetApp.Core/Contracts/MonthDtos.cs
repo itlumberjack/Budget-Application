@@ -55,14 +55,15 @@ public record PayExtraDto(int Id, string Description, decimal Amount);
 
 /// <summary>
 /// A bill in a month. PaysLate is set when its payday comes after the due day. PlannedAmount is its amount in the
-/// month's plan (null when there's no plan or it was added after).
+/// month's plan (null when there's no plan or it was added after). ExtraForDebtId marks a payday's share of
+/// the Debt Payoff page's extra payment and names the loan it goes to.
 /// </summary>
 public record BillDto(int Id, string Title, string? Company, decimal Amount, int? DueDay, int CategoryId, string? Category,
-    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate, decimal? PlannedAmount)
+    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate, decimal? PlannedAmount, int? ExtraForDebtId)
 {
     public static BillDto From(BudgetExpense e, bool paysLate) =>
         new(e.Id, e.Title, e.Company, e.Amount, e.DueDay, e.CategoryId, e.Category?.Name, e.Status, e.IsFixed,
-            e.RecurringDebtId is not null, e.PayPeriodId, paysLate, e.PlannedAmount);
+            e.RecurringDebtId is not null, e.PayPeriodId, paysLate, e.PlannedAmount, e.ExtraForDebtId);
 }
 
 /// <summary>Left over, the buffer held back, and each person's share.</summary>

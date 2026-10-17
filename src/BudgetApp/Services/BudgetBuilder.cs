@@ -29,6 +29,7 @@ public class BudgetBuilder(BudgetDbContext db)
     private async Task<MonthlyBudget> CreateMonthCoreAsync(int year, int month)
     {
         var budget = await db.MonthlyBudgets.FirstOrDefaultAsync(b => b.Year == year && b.Month == month);
+        var isNew = budget is null;
         if (budget is null)
         {
             budget = new MonthlyBudget { Year = year, Month = month };
@@ -36,6 +37,7 @@ public class BudgetBuilder(BudgetDbContext db)
             await db.SaveChangesAsync();
         }
         await SyncAsync(budget.Id);
+        if (isNew) await SpreadDebtExtraCoreAsync(budget.Id);
         return budget;
     }
 
@@ -217,6 +219,91 @@ public class BudgetBuilder(BudgetDbContext db)
         }
         await db.SaveChangesAsync();
         return moved;
+    });
+
+    /// <summary>
+    /// Spreads the Debt Payoff page's extra monthly payment (plus any one-time extra that month) over the
+    /// paydays of this month and later ones, or just one month. Paydays with more left over give more, so they
+    /// end up about even, and each share goes to the loans in the payoff strategy's order using their projected
+    /// balances. Shares already marked pending or complete are kept and count toward the month's total; the
+    /// rest are redone. In this month, paydays that have already passed are skipped while a later one is left.
+    /// </summary>
+    public Task SpreadDebtExtraAsync(int? budgetId = null) => Exclusive(async () =>
+    {
+        var ids = budgetId is int id ? [id]
+            : await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived).Select(b => b.Id).ToListAsync();
+        foreach (var month in ids) await SpreadDebtExtraCoreAsync(month);
+    });
+
+    private async Task SpreadDebtExtraCoreAsync(int budgetId)
+    {
+        var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).ThenInclude(p => p.Extras).Include(b => b.Expenses)
+            .FirstAsync(b => b.Id == budgetId);
+        if (budget.IsArchived) return;
+        db.BudgetExpenses.RemoveRange(budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status == PaymentStatus.NotPaid));
+        await db.SaveChangesAsync();
+
+        var settings = await db.GetDebtPlanAsync();
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        var first = Dates.ThisMonth;
+        if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly || budget.FirstDay < first) return;
+        var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
+        var total = settings.ExtraMonthly + oneTime
+            - budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid).Sum(e => e.Amount);
+        if (total <= 0) return;
+
+        // Each loan's balance at the start of this month, as the payoff plan projects it from today's balances.
+        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
+        var monthIndex = (budget.Year - first.Year) * 12 + budget.Month - first.Month;
+        var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.ExtraMonthly, first, settings.OneTimeAmount, settings.OneTimeMonth);
+        var startBalances = monthIndex == 0 ? inputs.ToDictionary(d => d.Id, d => d.Balance)
+            : monthIndex <= plan.Schedule.Count ? plan.Schedule[monthIndex - 1].Balances
+            : inputs.ToDictionary(d => d.Id, _ => 0m);
+        // What a loan can still take this month: its balance less the minimum payment and any extra already paid.
+        var paidExtra = budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid)
+            .GroupBy(e => e.ExtraForDebtId!.Value).ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
+        var targets = DebtPlanner.Order(inputs, settings.Strategy)
+            .Select(d => (d.Id, Capacity: Math.Max(0, startBalances.GetValueOrDefault(d.Id) - d.MinPayment - paidExtra.GetValueOrDefault(d.Id))))
+            .Where(d => d.Capacity > 0).ToList();
+        if (targets.Count == 0) return;
+
+        var view = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget };
+        var columns = view.Columns.Where(c => !c.IsUnassigned).ToList();
+        if (budget.FirstDay == first && columns.Any(c => c.Paychecks.Max(p => p.PayDate.Date) >= DateTime.Today))
+            columns = columns.Where(c => c.Paychecks.Max(p => p.PayDate.Date) >= DateTime.Today).ToList();
+        if (columns.Count == 0) return;
+
+        var shares = DebtExtraSplitter.Spread(columns.Select(c => c.LeftOver).ToList(), total);
+        var payments = DebtExtraSplitter.Assign(columns.Select((c, i) => (c.TargetPayPeriodId!.Value, shares[i])).ToList(), targets);
+        var byId = loans.ToDictionary(l => l.Id);
+        foreach (var p in payments)
+        {
+            var loan = byId[p.DebtId];
+            db.BudgetExpenses.Add(new BudgetExpense
+            {
+                MonthlyBudgetId = budget.Id, PayPeriodId = p.PayPeriodId, ExtraForDebtId = loan.Id,
+                Title = $"Extra: {loan.Title}", Company = loan.Company, CategoryId = loan.CategoryId,
+                Amount = p.Amount, IsFixed = true
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Debt Payoff used to offer weekly or every-two-weeks loan payments. Loans still on one of those
+    /// schedules go back to one monthly payment, here and in this month's and later budgets.
+    /// </summary>
+    public Task UndoLoanPaymentScheduleAsync() => Exclusive(async () =>
+    {
+        var settings = await db.GetDebtPlanAsync();
+        if (settings.PaymentFrequency == BillFrequency.Monthly) return;
+        var loans = await db.RecurringDebts.Where(d => d.Kind == BillKind.Loan && d.Frequency != BillFrequency.Monthly).ToListAsync();
+        foreach (var loan in loans) loan.ChangePaymentSchedule(BillFrequency.Monthly, null);
+        settings.PaymentFrequency = BillFrequency.Monthly;
+        settings.PaymentStartDate = null;
+        await db.SaveChangesAsync();
+        await RescheduleAsync(loans.Select(l => l.Id).ToList());
+        await SpreadDebtExtraAsync();
     });
 
     /// <summary>

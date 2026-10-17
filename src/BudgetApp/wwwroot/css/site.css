@@ -290,3 +290,4 @@ tr.moving { opacity: .5; pointer-events: none; }
 .now-block .swatch.status-pending { background: var(--pending-bg); border-color: var(--pending-solid); }
 .plan-was { font-size: .72rem; color: var(--muted, #6c757d); font-weight: 400; line-height: 1.1; }
 .sheet-summary .plan-table tfoot td { font-size: .95rem; white-space: nowrap; }
+.badge-snowball { background: var(--brand-soft); color: var(--brand-ink); border: 1px solid var(--brand-ring); font-weight: 500; }

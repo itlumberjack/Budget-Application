@@ -139,14 +139,21 @@ Each month, every debt is charged interest (balance × APR ÷ 12) and paid its m
 monthly payment (the snowball) goes to the first unpaid debt in the strategy's order. When a debt is
 paid off, its minimum is added to the snowball.
 
-### Paying loans weekly or every two weeks
+### Extra payment by payday
 
-Under **Pay loans** on Debt Payoff, pick *Every two weeks* or *Every week* and the first payment date (it
-suggests the next weekly payday). Each loan is then paid half its monthly payment every two weeks, or a
-quarter every week. That adds up to 13 monthly payments a year, so the plan shows how much sooner and
-cheaper it is than paying monthly. Every loan on Bills & Expenses switches to the schedule, new loans join
-it, and this month's and later budgets are rebuilt with the payments on those dates. Payments already marked
-pending or complete stay as they are. Switching back to *Once a month* restores the monthly payment and due day.
+**Extra each month** (plus a one-time extra in its month) is paid out of each month's paydays. Paydays with more
+left over give more, so every payday ends up with about the same left over. When one payday has far more left
+than the others, all of the extra can come from it. Each payday's share shows on the month page as an
+"Extra: <loan>" line with a *snowball* badge, and it goes to the first loan in the strategy's order, moving to
+the next loan once the first is covered. Later months use the plan's projected balances. In this month, paydays
+that have already passed are skipped.
+
+Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid
+shares again. Shares marked pending or complete are kept and count toward that month's total. You can change a
+share's amount on the month page. The Debt Payoff page lists this month's shares under *Extra by payday*.
+
+Loans used to have a weekly or every-two-weeks option. Any loan still on one of those schedules goes back to
+one monthly payment when the site starts.
 
 ## AI helper (optional)
 

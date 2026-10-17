@@ -41,4 +41,11 @@ public class BudgetExpense
     /// <summary>The amount when the month's plan was saved. Null for bills added after that (or before any plan).</summary>
     [Column(TypeName = "decimal(12,2)")]
     public decimal? PlannedAmount { get; set; }
+
+    /// <summary>
+    /// Set on a payday's share of the Debt Payoff page's extra monthly payment, naming the loan it goes to.
+    /// These are spread over the paydays automatically; see BudgetBuilder.SpreadDebtExtraAsync.
+    /// </summary>
+    public int? ExtraForDebtId { get; set; }
+    public RecurringDebt? ExtraForDebt { get; set; }
 }
