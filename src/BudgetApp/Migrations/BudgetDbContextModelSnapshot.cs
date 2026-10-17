@@ -38,6 +38,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("DueDay")
                         .HasColumnType("int");
 
+                    b.Property<bool>("ExtraAddedByHand")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int?>("ExtraForDebtId")
                         .HasColumnType("int");
 

@@ -277,13 +277,14 @@
                             <tr class="clickable status-@e.Status.ToString().ToLower()" draggable="@(targets != "" ? "true" : "false")" data-targets="@targets" data-bs-toggle="modal" data-bs-target="#expenseModal" data-mode="edit"
                                 data-id="@e.Id" data-title="@e.Title" data-company="@e.Company" data-amount="@e.Amount.ToString("0.00")"
                                 data-due="@e.DueDay" data-category="@e.CategoryId" data-pay="@e.PayPeriodId" data-status="@e.Status" data-fixed="@(e.IsFixed ? "1" : "")"
-                                data-kind="@(e.ExtraForDebtId is not null ? "snowball" : e.RecurringDebtId is not null ? "recurring" : "")">
+                                data-kind="@(e.ExtraForDebtId is not null && !e.ExtraAddedByHand ? "snowball" : e.RecurringDebtId is not null ? "recurring" : "")">
                                 <td>
                                     @e.Title
                                     @if (e.DueDay is int due) { <span class="text-muted small">(@Dates.Ordinal(due))</span> }
                                     @if (e.IsFixed) { <i class="bi bi-pin-angle-fill text-muted small" title="Fixed to this payday. Even out and the AI helper leave it here."></i> }
                                     @if (!Model.PaysOnTime(col, e)) { <i class="bi bi-exclamation-triangle-fill text-warning small" title="This payday comes after the bill is due."></i> }
-                                    @if (e.ExtraForDebtId is not null) { <span class="badge badge-snowball" title="This payday's share of the extra debt payment from Debt Payoff">snowball</span> }
+                                    @if (e.ExtraAddedByHand) { <span class="badge badge-snowball" title="A snowball payment added on this month, on top of the extra from Debt Payoff">snowball +</span> }
+                                    else if (e.ExtraForDebtId is not null) { <span class="badge badge-snowball" title="This payday's share of the extra debt payment from Debt Payoff">snowball</span> }
                                     else if (e.RecurringDebtId is null) { <span class="badge text-bg-secondary">extra</span> }
                                 </td>
                                 <td>@e.Company</td>
@@ -457,6 +458,27 @@
             <div class="modal-body">
                 <input type="hidden" name="id" />
                 <input type="hidden" name="budgetId" value="@b.Id" />
+                @{ var debts = (List<RecurringDebt>?)ViewBag.Debts ?? new(); }
+                <div class="mb-2 add-only" id="pickGroup">
+                    <label class="form-label" for="pickDebt">Pick a loan or bill</label>
+                    <select class="form-select" id="pickDebt">
+                        <option value="">Something new (type it below)</option>
+                        @foreach (var g in debts.GroupBy(d => d.Kind == BillKind.Loan))
+                        {
+                            <optgroup label="@(g.Key ? "Loans" : "Bills & expenses")">
+                                @foreach (var d in g)
+                                {
+                                    <option value="@d.Id" data-loan="@(g.Key ? "1" : "")" data-title="@d.Title" data-company="@d.Company" data-amount="@d.Amount.ToString("0.00")"
+                                            data-due="@d.DueDay" data-category="@d.CategoryId" data-fixed="@(d.IsFixed ? "1" : "")">@d.Title@(d.Company is null ? "" : $" ({d.Company})")</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <div class="form-check form-switch mt-2" id="snowballGroup" hidden>
+                        <input class="form-check-input" type="checkbox" role="switch" id="snowballSwitch" name="snowballDebtId" />
+                        <label class="form-check-label" for="snowballSwitch">Snowball payment: extra on this loan, on top of Debt Payoff's extra</label>
+                    </div>
+                </div>
                 <div class="mb-2"><label class="form-label">Item</label><input name="title" class="form-control" required /></div>
                 <div class="mb-2"><label class="form-label">Company</label><input name="company" class="form-control" /></div>
                 <div class="row g-2 mb-2">
@@ -755,6 +777,11 @@
             form.elements['categoryId'].value = d.category;
             form.elements['status'].value = isAdd ? 'NotPaid' : d.status;
             form.elements['isFixed'].checked = !isAdd && d.fixed === '1';
+            // Adding: a loan or bill can be picked from the list to fill in the rest.
+            const pick = document.getElementById('pickDebt'), snow = document.getElementById('snowballSwitch');
+            document.getElementById('pickGroup').hidden = !isAdd;
+            pick.value = ''; snow.checked = false; document.getElementById('snowballGroup').hidden = true;
+            form.elements['title'].readOnly = false;
             // Recurring bills and shares of the extra debt payment can carry a change on to later months.
             const kind = isAdd ? '' : d.kind;
             document.getElementById('forwardGroup').hidden = !kind;
@@ -775,6 +802,34 @@
             form.elements['payPeriodId'].value = option ? option.value : '';
         });
         expenseModal.addEventListener('shown.bs.modal', () => document.getElementById('expenseForm').elements['title'].focus());
+        const pickDebt = document.getElementById('pickDebt'), snowSwitch = document.getElementById('snowballSwitch');
+        const showSnowball = () => {
+            const form = document.getElementById('expenseForm'), o = pickDebt.selectedOptions[0];
+            const on = snowSwitch.checked && !!o.dataset.loan;
+            snowSwitch.value = pickDebt.value;
+            form.elements['title'].value = on ? 'Extra: ' + o.dataset.title : (o.value ? o.dataset.title : form.elements['title'].value);
+            form.elements['title'].readOnly = on;
+            if (on) { form.elements['amount'].value = ''; form.elements['amount'].placeholder = 'How much extra'; form.elements['dueDay'].value = ''; form.elements['isFixed'].checked = true; }
+            else {
+                form.elements['amount'].placeholder = '';
+                if (o.value && !form.elements['amount'].value) form.elements['amount'].value = o.dataset.amount;
+            }
+        };
+        pickDebt.addEventListener('change', () => {
+            const form = document.getElementById('expenseForm'), o = pickDebt.selectedOptions[0];
+            document.getElementById('snowballGroup').hidden = !o.dataset.loan;
+            if (!o.dataset.loan) snowSwitch.checked = false;
+            if (o.value) {
+                form.elements['title'].value = o.dataset.title;
+                form.elements['company'].value = o.dataset.company || '';
+                form.elements['amount'].value = o.dataset.amount;
+                form.elements['dueDay'].value = o.dataset.due || '';
+                form.elements['categoryId'].value = o.dataset.category;
+                form.elements['isFixed'].checked = o.dataset.fixed === '1';
+            }
+            showSnowball();
+        });
+        snowSwitch.addEventListener('change', showSnowball);
 
         document.getElementById('payModal').addEventListener('show.bs.modal', e => {
             const d = e.relatedTarget.dataset;

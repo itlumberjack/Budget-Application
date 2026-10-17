@@ -188,6 +188,11 @@ share's amount on the month page, or remove it: the month's other paydays make u
 still pays the extra set on Debt Payoff, and the changed payday keeps its amount when the extra is spread again.
 Turn on *Also change later months* in that dialog to make the month's new total the monthly extra instead.
 
+To add something on a month page, use *add* in a category. *Pick a loan or bill* fills in the item, company, amount,
+due day and category from Bills & Expenses (or choose *Something new* and type it). For a loan, turn on *Snowball
+payment* and enter how much: it adds an "Extra: <loan>" line on that payday with a *snowball +* badge. It's on top
+of the extra from Debt Payoff, so the other shares stay as they are, and deleting it removes it.
+
 The snowball goes to one loan at a time: all the extra goes to the first loan in the strategy's order, and moves
 on only once it's paid off (the rest of that month's extra goes to the next loan). A loan with a promo the plan
 would otherwise miss moves to the front of the line. The Debt Payoff page lists this month's shares under *Extra by payday*.
