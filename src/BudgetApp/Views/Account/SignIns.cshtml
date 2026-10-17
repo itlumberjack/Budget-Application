@@ -1,0 +1,87 @@
+@model SignInsModel
+@{
+    ViewData["Title"] = "Sign-ins";
+}
+
+<div class="mx-auto" style="max-width:40rem">
+<h1 class="mb-1">Sign-ins</h1>
+<p class="page-subtitle mb-3">Who can open the budget, on the website and the phone app.</p>
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+<div class="card mb-3"><div class="card-body p-3 p-md-4">
+    <h2 class="h5 mb-3"><i class="bi bi-people text-brand me-1"></i> People</h2>
+    <ul class="list-group list-group-flush" id="people">
+        @foreach (var email in Model.People)
+        {
+            <li class="list-group-item d-flex align-items-center gap-2 px-0">
+                <i class="bi bi-person-circle"></i>
+                <span class="me-auto">@email @if (email == Model.Me) { <span class="badge text-bg-secondary ms-1">you</span> }</span>
+                @if (email != Model.Me)
+                {
+                    <form asp-action="RemovePerson" method="post" onsubmit="return confirm('Remove @email\'s sign-in?')">
+                        <input type="hidden" name="email" value="@email" />
+                        <button class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                }
+            </li>
+        }
+    </ul>
+</div></div>
+
+<form asp-action="AddPerson" method="post" id="addPerson">
+    <div class="card mb-3"><div class="card-body p-3 p-md-4">
+        <h2 class="h5 mb-1"><i class="bi bi-person-plus text-brand me-1"></i> Add a person</h2>
+        <p class="item-meta mb-3">Give them the email and password you pick here. They can change the password after they sign in.</p>
+        <div class="row g-3">
+            <div class="col-12">
+                <label asp-for="NewPerson.Email" class="form-label"></label>
+                <input asp-for="NewPerson.Email" class="form-control" autocomplete="off" />
+                <span asp-validation-for="NewPerson.Email" class="text-danger"></span>
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="NewPerson.Password" class="form-label"></label>
+                <input asp-for="NewPerson.Password" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="NewPerson.Password" class="text-danger"></span>
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="NewPerson.ConfirmPassword" class="form-label"></label>
+                <input asp-for="NewPerson.ConfirmPassword" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="NewPerson.ConfirmPassword" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="form-text">At least 8 characters, with an uppercase letter, a lowercase letter and a number.</div>
+        <button class="btn btn-primary mt-3">Add person</button>
+    </div></div>
+</form>
+
+<form asp-action="ChangePassword" method="post" id="changePassword">
+    <div class="card mb-3"><div class="card-body p-3 p-md-4">
+        <h2 class="h5 mb-3"><i class="bi bi-key text-brand me-1"></i> Change your password</h2>
+        <div class="row g-3">
+            <div class="col-12">
+                <label asp-for="ChangePassword.CurrentPassword" class="form-label"></label>
+                <input asp-for="ChangePassword.CurrentPassword" class="form-control" autocomplete="current-password" />
+                <span asp-validation-for="ChangePassword.CurrentPassword" class="text-danger"></span>
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="ChangePassword.NewPassword" class="form-label"></label>
+                <input asp-for="ChangePassword.NewPassword" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="ChangePassword.NewPassword" class="text-danger"></span>
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="ChangePassword.ConfirmPassword" class="form-label"></label>
+                <input asp-for="ChangePassword.ConfirmPassword" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="ChangePassword.ConfirmPassword" class="text-danger"></span>
+            </div>
+        </div>
+        <button class="btn btn-primary mt-3">Change password</button>
+    </div></div>
+</form>
+
+<p class="item-meta"><a asp-controller="Settings" asp-action="Index"><i class="bi bi-arrow-left"></i> Back to Settings</a></p>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -4,7 +4,10 @@ using BudgetApp.Helpers;
 
 namespace BudgetApp.Models;
 
-/// <summary>A bill that repeats every month, week or two weeks (power bill, mortgage, daycare...).</summary>
+/// <summary>
+/// Something that repeats every month, week or two weeks: a bill (power, cell phone), a living expense
+/// (food, gas) or a loan (car payment, credit card). Shown on the Bills &amp; Expenses page.
+/// </summary>
 public class RecurringDebt
 {
     public int Id { get; set; }
@@ -20,6 +23,9 @@ public class RecurringDebt
     [Range(0, 10_000_000)]
     [DataType(DataType.Currency)]
     public decimal Amount { get; set; }
+
+    [Display(Name = "Type")]
+    public BillKind Kind { get; set; } = BillKind.Bill;
 
     [Display(Name = "Category")]
     public int CategoryId { get; set; }
@@ -39,16 +45,16 @@ public class RecurringDebt
     public DateTime? StartDate { get; set; }
 
     /// <summary>
-    /// A fixed bill stays on the payday it falls under (weekly groceries, say). Even out and the AI helper
-    /// only move flexible bills.
+    /// A fixed (mandatory) item stays on the payday it falls under, like weekly groceries. Even out and the
+    /// AI helper only move flexible ones.
     /// </summary>
-    [Display(Name = "Fixed to its payday")]
+    [Display(Name = "Mandatory: stays on its payday")]
     public bool IsFixed { get; set; }
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 
-    /// <summary>For a loan or card: what's still owed. Debts with a balance show on the Debt page.</summary>
+    /// <summary>For a loan or card: what's still owed. Loans with a balance show on the Debt Payoff page.</summary>
     [Column(TypeName = "decimal(12,2)")]
     [Range(0, 100_000_000)]
     [DataType(DataType.Currency)]
@@ -71,7 +77,17 @@ public class RecurringDebt
     public DateTime? BalanceAsOf { get; set; }
 
     [NotMapped]
-    public bool IsLoan => Balance > 0;
+    public bool IsLoan => Kind == BillKind.Loan && Balance > 0;
+
+    /// <summary>Only loans keep a balance, interest rate and payoff priority.</summary>
+    public void ClearLoanDetailsUnlessLoan()
+    {
+        if (Kind == BillKind.Loan) return;
+        Balance = null;
+        InterestRate = null;
+        PayoffPriority = null;
+        BalanceAsOf = null;
+    }
 
     /// <summary>What the bill costs in an average month (a weekly bill comes 52 times a year).</summary>
     [NotMapped]
@@ -81,6 +97,39 @@ public class RecurringDebt
         BillFrequency.BiWeekly => Math.Round(Amount * 26 / 12, 2),
         _ => Amount
     };
+
+    /// <summary>The monthly payment a weekly (quarter) or every-two-weeks (half) loan payment was split from.</summary>
+    [NotMapped]
+    public decimal MonthlyPaymentBeforeSplit => Frequency switch
+    {
+        BillFrequency.Weekly => Amount * 4,
+        BillFrequency.BiWeekly => Amount * 2,
+        _ => Amount
+    };
+
+    /// <summary>
+    /// Puts a loan on the Debt Payoff page's payment schedule: monthly, half the monthly payment every two weeks,
+    /// or a quarter of it every week (rounded up to the cent). Going back to monthly keeps the old due day, or
+    /// uses the first payment's day of the month.
+    /// </summary>
+    public void ChangePaymentSchedule(BillFrequency frequency, DateTime? firstPayment)
+    {
+        var monthly = MonthlyPaymentBeforeSplit;
+        Amount = frequency switch
+        {
+            BillFrequency.Weekly => Math.Ceiling(monthly * 100 / 4) / 100,
+            BillFrequency.BiWeekly => Math.Ceiling(monthly * 100 / 2) / 100,
+            _ => monthly
+        };
+        if (frequency == BillFrequency.Monthly)
+        {
+            DueDay ??= StartDate?.Day;
+            StartDate = null;
+        }
+        else
+            StartDate = (firstPayment ?? DateTime.Today).Date;
+        Frequency = frequency;
+    }
 
     /// <summary>
     /// The days this bill is due in a month: one for a monthly bill (or none set), and every week or

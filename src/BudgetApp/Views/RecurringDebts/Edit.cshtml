@@ -1,6 +1,14 @@
 @model RecurringDebt
 @{
-    ViewData["Title"] = Model.Id == 0 ? "Add a recurring debt" : $"Edit {Model.Title}";
+    ViewData["Title"] = Model.Id == 0
+        ? Model.Kind switch { BillKind.LivingExpense => "Add a living expense", BillKind.Loan => "Add a loan", _ => "Add a bill" }
+        : $"Edit {Model.Title}";
+    var kinds = new[]
+    {
+        (Kind: BillKind.Bill, Icon: "bi-receipt", Hint: "Utilities, cell phone, insurance, subscriptions."),
+        (Kind: BillKind.LivingExpense, Icon: "bi-basket", Hint: "Food, gas and other spending that comes every week or two."),
+        (Kind: BillKind.Loan, Icon: "bi-bank", Hint: "Mortgage, car loan, credit card. Has an amount owed and interest, and shows on Debt Payoff.")
+    };
 }
 
 <div class="mx-auto" style="max-width:36rem">
@@ -10,6 +18,20 @@
 
 <form asp-action="Save" method="post" >
     <input type="hidden" asp-for="Id" />
+    <div class="mb-3">
+        <label class="form-label d-block">Type</label>
+        <div class="btn-group w-100" role="group" aria-label="Type">
+            @foreach (var k in kinds)
+            {
+                <input type="radio" class="btn-check" name="Kind" id="kind-@k.Kind" value="@k.Kind" checked="@(Model.Kind == k.Kind)" autocomplete="off" />
+                <label class="btn btn-outline-primary" for="kind-@k.Kind"><i class="bi @k.Icon me-1"></i>@k.Kind.DisplayName()</label>
+            }
+        </div>
+        @foreach (var k in kinds)
+        {
+            <div class="form-text kind-hint" data-kind="@k.Kind">@k.Hint</div>
+        }
+    </div>
     <div class="mb-3">
         <label asp-for="Title" class="form-label"></label>
         <input asp-for="Title" class="form-control" placeholder="e.g. Power bill" />
@@ -26,7 +48,7 @@
             <span class="input-group-text">$</span>
             <input asp-for="Amount" class="form-control" step="0.01" type="number" inputmode="decimal" />
         </div>
-        <div class="form-text">What you pay each time it's due. For a loan or card, the minimum payment.</div>
+        <div class="form-text">What you pay each time it's due<span class="kind-hint" data-kind="Loan">: the minimum payment</span>.</div>
         <span asp-validation-for="Amount" class="text-danger"></span>
     </div>
     <div class="mb-3">
@@ -53,11 +75,11 @@
     <div class="form-check form-switch mb-3">
         <input asp-for="IsFixed" class="form-check-input" role="switch" />
         <label asp-for="IsFixed" class="form-check-label"></label>
-        <div class="form-text">Turn on for things that have to come out of their own payday, like weekly groceries. Even out and the AI helper only move bills that are off (flexible).</div>
+        <div class="form-text">Turn on for things that have to come out of every payday they fall on, like weekly groceries or gas. Even out and the AI helper only move items that are off (flexible).</div>
     </div>
-    <details class="loan-details mb-3" @(Model.Balance is not null ? "open" : "")>
-        <summary class="fw-semibold"><i class="bi bi-bank me-1"></i> Loan or credit card details</summary>
-        <p class="form-text mt-2">Fill these in for anything with a balance, and it shows up on the <a asp-controller="Debt" asp-action="Index">Debt</a> page with payoff plans.</p>
+    <fieldset class="loan-details border rounded p-3 mb-3" id="loanGroup">
+        <legend class="fs-6 fw-semibold float-none w-auto px-1 mb-0"><i class="bi bi-bank me-1"></i> Loan details</legend>
+        <p class="form-text">With an amount owed, the loan shows up on <a asp-controller="Debt" asp-action="Index">Debt Payoff</a> with payoff plans.</p>
         <div class="row g-3">
             <div class="col-sm-6">
                 <label asp-for="Balance" class="form-label"></label>
@@ -82,7 +104,7 @@
                 <span asp-validation-for="PayoffPriority" class="text-danger"></span>
             </div>
         </div>
-    </details>
+    </fieldset>
     <input type="hidden" asp-for="BalanceAsOf" />
     <div class="form-check mb-3">
         <input asp-for="IsActive" class="form-check-input" />
@@ -114,11 +136,27 @@
             document.getElementById('StartDate').required = !monthly;
         };
         billFrequency.addEventListener('change', showSchedule);
-        // Weekly bills are usually tied to their payday, so a new one starts out fixed until you change it.
+        // Weekly items are usually tied to their payday, so a new one starts out mandatory until you change it.
         const isFixed = document.getElementById('IsFixed');
         let fixedTouched = @(Model.Id != 0 ? "true" : "false");
         isFixed.addEventListener('change', () => fixedTouched = true);
         billFrequency.addEventListener('change', () => { if (!fixedTouched) isFixed.checked = billFrequency.value !== '0'; });
         showSchedule();
+
+        // Only loans have loan details. Hidden fields are disabled so they aren't sent (or checked) when saving.
+        const loanGroup = document.getElementById('loanGroup');
+        const isNew = @(Model.Id == 0 ? "true" : "false");
+        const showKind = picked => {
+            const kind = document.querySelector('input[name=Kind]:checked').value;
+            loanGroup.hidden = loanGroup.disabled = kind !== 'Loan';
+            document.querySelectorAll('.kind-hint').forEach(h => h.hidden = h.dataset.kind !== kind);
+            // A new living expense starts out weekly and mandatory, like food.
+            if (picked && isNew && kind === 'LivingExpense' && billFrequency.value === '0') {
+                billFrequency.value = '1'; showSchedule();
+                if (!fixedTouched) isFixed.checked = true;
+            }
+        };
+        document.querySelectorAll('input[name=Kind]').forEach(r => r.addEventListener('change', () => showKind(true)));
+        showKind(false);
     </script>
 }

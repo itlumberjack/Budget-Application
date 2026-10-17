@@ -57,8 +57,9 @@
 }
 
 <div class="@(b.IsArchived ? "archived" : "")">
+<div id="liveAlerts"></div>
 <!-- Totals -->
-<div class="row g-3 mb-3">
+<div class="row g-3 mb-3" id="monthTotals">
     <div class="col-6 col-lg-3">
         <div class="card stat">
             <div class="label"><span class="stat-icon icon-income"><i class="bi bi-cash-stack"></i></span> Income</div>
@@ -104,7 +105,7 @@
 </div>
 
 <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3 mb-2">
-    <div class="payday-pills flex-grow-1" aria-label="Jump to a payday">
+    <div class="payday-pills flex-grow-1" aria-label="Jump to a payday" id="paydayPills">
         @for (var i = 0; i < columns.Count; i++)
         {
             <button type="button" class="btn btn-sm btn-outline-primary" data-jump="@i">@columns[i].Heading</button>
@@ -124,13 +125,17 @@
     </div>
 </div>
 <div class="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted edit-only">
-    <span><i class="bi bi-hand-index"></i> Tap a row to edit. Tap the dot to change its status.</span>
+    <span><i class="bi bi-hand-index"></i> Tap a row to edit. Tap the dot to change its status. Drag a bill to move it to another payday.</span>
     <span class="legend"><span class="swatch status-complete"></span> Complete</span>
     <span class="legend"><span class="swatch status-pending"></span> Pending</span>
     <span class="legend"><span class="swatch status-notpaid"></span> Not paid</span>
-    <span><i class="bi bi-pin-angle-fill"></i> Fixed to its payday</span>
+    <span><i class="bi bi-pin-angle-fill"></i> Mandatory: stays on its payday</span>
     <span><i class="bi bi-exclamation-triangle-fill text-warning"></i> Payday is after the due date</span>
 </div>
+
+<form asp-action="MoveExpense" method="post" id="moveForm" class="d-none">
+    <input type="hidden" name="id" /><input type="hidden" name="payPeriodId" />
+</form>
 
 <!-- One column per payday, like the budget spreadsheet. Every block is a grid row so sections line up across columns. -->
 <div class="sheet mb-4" id="sheet">
@@ -141,7 +146,7 @@
             var isFirst = col == payColumns.FirstOrDefault();
             var isLast = col == payColumns.LastOrDefault();
             var payIds = string.Join(",", col.Paychecks.Select(p => p.Id));
-            <div class="sheet-heading @(col.IsUnassigned ? "text-muted" : "")">
+            <div class="sheet-heading @(col.IsUnassigned ? "text-muted" : "")" data-col="@columns.IndexOf(col)" data-pay-target="@col.TargetPayPeriodId">
                 @if (isFirst)
                 {
                     <form asp-action="ShiftPayday" method="post" class="shift-form shift-prev">
@@ -163,7 +168,7 @@
         @* Income *@
         @foreach (var col in columns)
         {
-            <div class="sheet-block">
+            <div class="sheet-block" data-col="@columns.IndexOf(col)">
                 <div class="block-title">
                     Income
                     @if (!col.IsUnassigned)
@@ -212,7 +217,7 @@
             foreach (var col in columns)
             {
                 var items = col.Expenses.Where(e => e.CategoryId == cat.Id).OrderBy(e => e.DueDay ?? 99).ThenBy(e => e.Title).ToList();
-                <div class="sheet-block @(canHideEmpty && !usedCategoryIds.Contains(cat.Id) ? "empty-cat" : "")">
+                <div class="sheet-block @(canHideEmpty && !usedCategoryIds.Contains(cat.Id) ? "empty-cat" : "")" data-col="@columns.IndexOf(col)">
                     <div class="block-title">
                         @cat.Name
                         <button type="button" class="btn btn-sm block-add" title="Add an expense to @cat.Name"
@@ -225,7 +230,10 @@
                         @foreach (var e in items)
                         {
                             var next = (PaymentStatus)(((int)e.Status + 1) % 3);
-                            <tr class="clickable status-@e.Status.ToString().ToLower()" data-bs-toggle="modal" data-bs-target="#expenseModal" data-mode="edit"
+                            // Paydays this bill can be dragged to: not after its due date, and never for a mandatory bill.
+                            var targets = b.IsArchived || e.IsFixed ? "" : string.Join(",", columns.Select((c, i) => (c, i))
+                                .Where(x => x.c != col && Model.CanMoveTo(x.c, e)).Select(x => x.i));
+                            <tr class="clickable status-@e.Status.ToString().ToLower()" draggable="@(targets != "" ? "true" : "false")" data-targets="@targets" data-bs-toggle="modal" data-bs-target="#expenseModal" data-mode="edit"
                                 data-id="@e.Id" data-title="@e.Title" data-company="@e.Company" data-amount="@e.Amount.ToString("0.00")"
                                 data-due="@e.DueDay" data-category="@e.CategoryId" data-pay="@e.PayPeriodId" data-status="@e.Status" data-fixed="@(e.IsFixed ? "1" : "")">
                                 <td>
@@ -257,7 +265,7 @@
         @* What's left from each paycheck *@
         @foreach (var col in columns)
         {
-            <div class="sheet-block sheet-summary">
+            <div class="sheet-block sheet-summary" data-col="@columns.IndexOf(col)">
                 <table class="sheet-table">
                     <tbody>
                         <tr><td>Income</td><td class="text-end money">@col.Income.ToString("C")</td></tr>
@@ -311,7 +319,7 @@
         <div class="card p-3 h-100 d-flex flex-column gap-2 justify-content-center">
             <form asp-action="Sync" method="post" class="d-grid edit-only">
                 <input type="hidden" name="id" value="@b.Id" />
-                <button class="btn btn-outline-primary" title="Adds paychecks and recurring debts that are missing from this month, and puts unassigned bills under a payday. Lines already here are left alone."><i class="bi bi-arrow-repeat me-1"></i> Add missing items</button>
+                <button class="btn btn-outline-primary" title="Adds paychecks and recurring bills that are missing from this month, and puts unassigned bills under a payday. Lines already here are left alone."><i class="bi bi-arrow-repeat me-1"></i> Add missing items</button>
             </form>
             @if (!b.IsArchived)
             {
@@ -490,28 +498,134 @@
 
 @section Scripts {
     <script>
+        const sheet = document.getElementById('sheet');
+
         // Payday pills scroll that column into view.
-        const headings = document.querySelectorAll('.sheet-heading');
-        document.querySelectorAll('[data-jump]').forEach(btn => btn.addEventListener('click', () => {
-            const sheet = document.getElementById('sheet');
-            const target = headings[+btn.dataset.jump];
+        document.getElementById('paydayPills').addEventListener('click', e => {
+            const btn = e.target.closest('[data-jump]');
+            if (!btn) return;
+            const target = sheet.querySelectorAll('.sheet-heading')[+btn.dataset.jump];
             sheet.scrollTo({ left: target.offsetLeft - 16, behavior: 'smooth' });
-        }));
+        });
 
         // Sections with nothing in them this month are hidden until "Show empty sections" is on.
         const showEmpty = document.getElementById('showEmpty');
-        const grid = document.getElementById('sheetGrid');
         try { showEmpty.checked = localStorage.getItem('budget.showEmpty') === '1'; } catch { }
         const applyEmpty = () => {
-            grid.classList.toggle('hide-empty', !showEmpty.checked);
+            document.getElementById('sheetGrid').classList.toggle('hide-empty', !showEmpty.checked);
             try { localStorage.setItem('budget.showEmpty', showEmpty.checked ? '1' : '0'); } catch { }
         };
         showEmpty.addEventListener('change', applyEmpty);
         applyEmpty();
 
-        // The status dot submits its own form; don't also open the edit dialog.
-        document.querySelectorAll('.status-cell').forEach(cell =>
-            cell.addEventListener('click', e => e.stopPropagation()));
+        // ----- Changes without a full page load -----
+        // Status changes and drags post as usual; the server answers with the updated month page, and only the
+        // totals, payday pills and sheet are swapped in, so the page doesn't flash or lose its scroll position.
+        let pending = Promise.resolve(), queued = 0;
+        const refreshFrom = async res => {
+            const html = await res.text();
+            const page = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = page.getElementById('sheet');
+            if (!res.ok || !fresh) { location.reload(); return; }
+            document.getElementById('monthTotals').innerHTML = page.getElementById('monthTotals').innerHTML;
+            document.getElementById('paydayPills').innerHTML = page.getElementById('paydayPills').innerHTML;
+            const left = sheet.scrollLeft;
+            sheet.innerHTML = fresh.innerHTML;
+            sheet.scrollLeft = left;
+            applyEmpty();
+            const error = page.querySelector('.alert-danger');
+            if (error) showError(error.querySelector('div').textContent);
+        };
+        const send = form => {
+            const body = new FormData(form);
+            queued++;
+            // One request at a time, in click order; only the last answer is drawn.
+            pending = pending.then(async () => {
+                try {
+                    const res = await fetch(form.action, { method: 'POST', body });
+                    if (--queued === 0) await refreshFrom(res);
+                } catch {
+                    queued = 0;
+                    location.reload();
+                }
+            });
+        };
+        const showError = message => {
+            const box = document.createElement('div');
+            box.className = 'alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2';
+            box.setAttribute('role', 'alert');
+            box.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i><div></div><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            box.querySelector('div').textContent = message;
+            document.getElementById('liveAlerts').replaceChildren(box);
+        };
+
+        // The status dot: show the next status straight away, then save it.
+        const statuses = ['NotPaid', 'Pending', 'Complete'];
+        const names = { NotPaid: 'Not paid', Pending: 'Pending', Complete: 'Complete' };
+        // The dot has its own job; don't also open the edit dialog. Bootstrap opens dialogs from a capturing
+        // listener on the document, so this has to stop the click earlier, on the window.
+        window.addEventListener('click', e => {
+            if (e.target.closest?.('#sheet .status-cell')) e.stopPropagation();
+        }, true);
+        sheet.addEventListener('submit', e => {
+            const form = e.target.closest('.status-cell form');
+            if (!form) return;
+            e.preventDefault();
+            const row = form.closest('tr');
+            const status = form.elements['status'].value;
+            const next = statuses[(statuses.indexOf(status) + 1) % 3];
+            row.classList.remove('status-notpaid', 'status-pending', 'status-complete');
+            row.classList.add('status-' + status.toLowerCase());
+            row.dataset.status = status;
+            form.querySelector('.status-dot').title = `${names[status]} (click for ${names[next]})`;
+            send(form);
+            form.elements['status'].value = next; // a quick second click moves on to the one after
+        });
+
+        // Drag a bill to another payday. Paydays it can't go to (after its due date) are dimmed.
+        let dragged = null;
+        const blocks = () => sheet.querySelectorAll('[data-col]');
+        sheet.addEventListener('dragstart', e => {
+            const row = e.target.closest('tr[draggable=true]');
+            if (!row) return;
+            dragged = row;
+            const ok = row.dataset.targets.split(',');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.title);
+            requestAnimationFrame(() => {
+                row.classList.add('dragging');
+                blocks().forEach(el => el.classList.add(ok.includes(el.dataset.col) ? 'drop-ok' : 'drop-no'));
+            });
+        });
+        const endDrag = () => {
+            dragged?.classList.remove('dragging');
+            dragged = null;
+            blocks().forEach(el => el.classList.remove('drop-ok', 'drop-no', 'drop-over'));
+        };
+        sheet.addEventListener('dragend', endDrag);
+        const target = e => {
+            const block = e.target.closest('[data-col]');
+            return dragged && block && dragged.dataset.targets.split(',').includes(block.dataset.col) ? block : null;
+        };
+        sheet.addEventListener('dragover', e => {
+            const block = target(e);
+            if (!block) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            blocks().forEach(el => el.classList.toggle('drop-over', el.dataset.col === block.dataset.col));
+        });
+        sheet.addEventListener('drop', e => {
+            const block = target(e);
+            if (!block) return;
+            e.preventDefault();
+            const heading = sheet.querySelector(`.sheet-heading[data-col="${block.dataset.col}"]`);
+            const form = document.getElementById('moveForm');
+            form.elements['id'].value = dragged.dataset.id;
+            form.elements['payPeriodId'].value = heading.dataset.payTarget;
+            dragged.classList.add('moving');
+            endDrag();
+            send(form);
+        });
 
         const expenseModal = document.getElementById('expenseModal');
         expenseModal.addEventListener('show.bs.modal', e => {

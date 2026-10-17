@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Controllers;
 
-/// <summary>Bills that repeat every month. These are copied into each new month's budget.</summary>
+/// <summary>The Bills &amp; Expenses page: bills, living expenses and loans that repeat. Each month's budget gets a copy.</summary>
 public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder) : Controller
 {
     public async Task<IActionResult> Index() =>
@@ -15,10 +15,17 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             .OrderBy(d => d.Category!.SortOrder).ThenBy(d => d.DueDay).ThenBy(d => d.Title)
             .ToListAsync());
 
-    public async Task<IActionResult> Create()
+    /// <summary>A new item. A living expense starts out weekly and mandatory, since that's what food and gas usually are.</summary>
+    public async Task<IActionResult> Create(BillKind kind = BillKind.Bill)
     {
         await LoadCategoriesAsync();
-        return View("Edit", new RecurringDebt());
+        var item = new RecurringDebt { Kind = Enum.IsDefined(kind) ? kind : BillKind.Bill };
+        if (item.Kind == BillKind.LivingExpense)
+        {
+            item.Frequency = BillFrequency.Weekly;
+            item.IsFixed = true;
+        }
+        return View("Edit", item);
     }
 
     public async Task<IActionResult> Edit(int id)
@@ -37,21 +44,33 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
         // Each schedule uses one of the two: a day of the month, or a first due date to count weeks from.
         if (debt.Frequency == BillFrequency.Monthly) debt.StartDate = null;
         else debt.DueDay = null;
+        if (!Enum.IsDefined(debt.Kind)) debt.Kind = BillKind.Bill;
+        debt.ClearLoanDetailsUnlessLoan();
         if (!ModelState.IsValid)
         {
             await LoadCategoriesAsync();
             return View("Edit", debt);
         }
         var isNew = debt.Id == 0;
-        var oldBalance = isNew ? null : await db.RecurringDebts.Where(d => d.Id == debt.Id).Select(d => d.Balance).FirstOrDefaultAsync();
-        if (debt.Balance != oldBalance) debt.BalanceAsOf = debt.Balance is null ? null : DateTime.Today;
+        var old = isNew ? null : await db.RecurringDebts.AsNoTracking().Where(d => d.Id == debt.Id).Select(d => new { d.Balance, d.Kind }).FirstOrDefaultAsync();
+        if (debt.Balance != old?.Balance) debt.BalanceAsOf = debt.Balance is null ? null : DateTime.Today;
+
+        // A monthly loan that's new (or just became a loan) joins the Debt Payoff page's weekly or every-two-weeks
+        // payments; the amount entered is the monthly payment it's split from.
+        var plan = await db.GetDebtPlanAsync();
+        var joinsSchedule = debt.Kind == BillKind.Loan && old?.Kind != BillKind.Loan
+            && debt.Frequency == BillFrequency.Monthly && plan.PaymentFrequency != BillFrequency.Monthly;
+        if (joinsSchedule) debt.ChangePaymentSchedule(plan.PaymentFrequency, plan.PaymentStartDate);
+        var scheduleNote = joinsSchedule
+            ? $" Like your other loans it's paid {(plan.PaymentFrequency == BillFrequency.Weekly ? "weekly" : "every two weeks")}: {debt.Amount:C} each time."
+            : "";
         if (isNew) db.RecurringDebts.Add(debt);
         else db.RecurringDebts.Update(debt);
         await db.SaveChangesAsync();
         if (isNew)
         {
             await builder.AddToCurrentAndFutureMonthsAsync(debt: debt);
-            TempData["Message"] = $"Added {debt.Title}. It's now in this month's budget and every month after.";
+            TempData["Message"] = $"Added {debt.Title}. It's now in this month's budget and every month after." + scheduleNote;
         }
         else
         {
@@ -59,7 +78,8 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             var months = db.MonthlyBudgets.FromThisMonth().Select(b => b.Id);
             await db.BudgetExpenses.Where(e => e.RecurringDebtId == debt.Id && months.Contains(e.MonthlyBudgetId))
                 .ExecuteUpdateAsync(u => u.SetProperty(e => e.IsFixed, debt.IsFixed));
-            TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts.";
+            if (joinsSchedule) await builder.RescheduleAsync([debt.Id]);
+            TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts." + scheduleNote;
         }
         return RedirectToAction(nameof(Index));
     }

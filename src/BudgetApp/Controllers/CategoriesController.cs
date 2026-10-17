@@ -42,7 +42,7 @@ public class CategoriesController(BudgetDbContext db) : Controller
                     || await db.BudgetExpenses.AnyAsync(e => e.CategoryId == id);
         if (inUse)
         {
-            TempData["Error"] = "That category is still used by a recurring debt or a month's budget, so it can't be deleted.";
+            TempData["Error"] = "That category is still used by a bill or expense or a month's budget, so it can't be deleted.";
             return RedirectToAction(nameof(Index));
         }
         var category = await db.Categories.FindAsync(id);

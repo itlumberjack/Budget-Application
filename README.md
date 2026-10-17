@@ -5,12 +5,15 @@ A personal budget app built with ASP.NET Core MVC (.NET 10) and MySQL.
 ## Pages
 
 - **Pay & Schedule**: each paycheck's take-home pay and schedule (weekly, every two weeks, twice a month, or monthly on a set day or the last day).
-- **Recurring Debts**: bills that repeat every month, each with a title, amount, category and optional due day.
+- **Bills & Expenses**: everything that repeats every month, week or two weeks. Each item has a type:
+  - **Bill**: utilities, cell phone, insurance, subscriptions.
+  - **Living expense**: food, gas and other spending that comes every week or two. New ones start weekly and mandatory.
+  - **Loan**: mortgage, car loan, credit card. Only loans have an amount owed, interest rate and payoff priority, and only loans show on Debt Payoff.
 - **Monthly Budgets**: one page per month (`/budget/2026/10`), built automatically the first time you open it, laid out like the family budget spreadsheet: one column per payday, with Income at the top of each column, then a section per category (Item | Company | Amount | Total), then what's left over from that paycheck. Paydays a few days apart (Sept 30 and Oct 2) share a column. On the month page you can:
   - click any row to edit it, move it to another payday, or remove it; click **+ add** in a section to add an extra expense (extra credit card payment, kids pictures);
   - click **+ extra** in an Income section to add a bonus or overtime to a paycheck, or click a paycheck to change its amount or date;
   - click the dot at the end of a row to cycle its status: **Not paid** (white), **Pending** (yellow), **Complete** (green, the money has come out of your account);
-  - new paychecks and recurring debts are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
+  - new paychecks and recurring bills are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
 
   New bills go under the last paycheck on or before their due day, or the month's first paycheck if they have no due day.
 - **Brad's rule** (top of Pay & Schedule, two switches): *End-of-month paychecks pay next month's bills* puts monthly pay that lands on the last day of the month into the next month's budget. *Weekly payday closest to the 1st starts the month* puts the last weekly payday of a month into the next month when it's at least as close to the 1st as the next payday is (October 30 vs. November 6 means October 30 goes to November; on a tie the earlier payday wins). Switching a rule moves paychecks in this month and later months (and last month's end-of-month check) to where the rule puts them, bills included.
@@ -53,7 +56,7 @@ Data entered in testing mode does not carry over to MySQL.
 
 - A recurring bill can be **monthly** (with a due day), **weekly** or **every two weeks**. For the last two,
   give any date it's due; each month gets a copy for every week (or every other week) from then on. The
-  Recurring Debts page totals what a typical month costs (a weekly bill counts 52 times a year).
+  Bills & Expenses page totals what a typical month costs (a weekly bill counts 52 times a year).
 - Budgets are always built through **six months ahead**. This happens when the app starts and whenever you
   open Monthly Budgets or a month, so new months appear on their own.
 - When a month is over it's **archived**: it moves to the Archive list at the bottom of Monthly Budgets and
@@ -62,7 +65,7 @@ Data entered in testing mode does not carry over to MySQL.
 
 ## Fixed and flexible bills
 
-Each bill on Recurring Debts has a **Fixed to its payday** switch. Fixed bills (weekly groceries, say)
+Each item on Bills & Expenses has a **Mandatory: stays on its payday** switch. Fixed bills (weekly groceries, say)
 stay on the payday they fall under; Even out and the AI helper only ever move flexible ones. Weekly and
 every-two-weeks bills start out fixed, monthly bills start out flexible, and a single month's copy can be
 switched in its edit dialog. On the month page fixed bills show a pin, and a warning triangle marks any
@@ -87,6 +90,14 @@ same amount left over. A bill only moves to a payday on or before its due day (o
 so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
 **Apply selected**.
 
+## Moving bills and marking them paid
+
+- **Drag a bill** to another payday's column to move it. While dragging, paydays after the bill's due date
+  are dimmed and won't take it, and mandatory bills (with a pin) don't drag at all; open one and turn
+  Mandatory off to move it. Dragging works with a mouse; on a phone, tap the bill and pick its payday instead.
+- **The status dot** cycles Not paid, Pending, Complete. It changes on the spot and saves in the background,
+  and the totals update without reloading the page.
+
 ## Shifting the first or last payday
 
 On a month page, the first payday column has a left arrow and the last one has a right arrow. The left
@@ -96,8 +107,8 @@ Bills it was covering move to the month's other paydays. A paycheck moved this w
 
 ## Debt payoff
 
-Give a bill on **Recurring Debts** an amount owed and an interest rate (under *Loan or credit card
-details*) and it becomes a loan. Its monthly amount is used as the minimum payment. The **Debt Payoff**
+Add a **Loan** on **Bills & Expenses** (or use *Add a loan* on Debt Payoff) with an amount owed and an
+interest rate. Its monthly amount is used as the minimum payment. The **Debt Payoff**
 page then shows:
 
 - Totals: amount owed, minimum payments, average rate (weighted by balance) and this month's interest.
@@ -112,6 +123,15 @@ page then shows:
 Each month, every debt is charged interest (balance × APR ÷ 12) and paid its minimum. The rest of the
 monthly payment (the snowball) goes to the first unpaid debt in the strategy's order. When a debt is
 paid off, its minimum is added to the snowball.
+
+### Paying loans weekly or every two weeks
+
+Under **Pay loans** on Debt Payoff, pick *Every two weeks* or *Every week* and the first payment date (it
+suggests the next weekly payday). Each loan is then paid half its monthly payment every two weeks, or a
+quarter every week. That adds up to 13 monthly payments a year, so the plan shows how much sooner and
+cheaper it is than paying monthly. Every loan on Bills & Expenses switches to the schedule, new loans join
+it, and this month's and later budgets are rebuilt with the payments on those dates. Payments already marked
+pending or complete stay as they are. Switching back to *Once a month* restores the monthly payment and due day.
 
 ## AI helper (optional)
 
@@ -132,6 +152,47 @@ export Anthropic__ApiKey="<your key>"
 `Anthropic:Model` in appsettings.json picks the model (default `claude-opus-5-5`). Each suggestion
 sends the month's paycheck amounts, bill names and amounts to Anthropic's API.
 
+## Signing in
+
+Every page needs someone signed in.
+
+- **First run:** the site opens a setup page to create the first sign-in (an email and a password with at least 8 characters, an uppercase letter, a lowercase letter and a number). The setup page goes away once an account exists, so create yours right after you publish.
+- **Adding Jessica:** Settings > Sign-ins. You pick her email and password; she can change the password after she signs in. The same page removes a sign-in (it stops working right away) and changes your own password.
+- **Forgot a password:** the other person removes the sign-in and adds it again with a new password. There's no email reset.
+- With the in-memory database the sign-ins disappear when the app stops, like everything else.
+
+## Phone app API
+
+The site also answers JSON under `/api` for the phone app. Sign in with the same email and password:
+
+```
+POST /api/auth/login     {"email": "...", "password": "..."}   -> accessToken (1 hour) and refreshToken
+POST /api/auth/refresh   {"refreshToken": "..."}               -> new tokens
+```
+
+Send `Authorization: Bearer <accessToken>` on every other call. The site's sign-in cookie doesn't work for `/api`.
+
+| Call | What it does |
+| --- | --- |
+| `GET /api/me` | Who is signed in |
+| `GET /api/months` | Every month's totals (archived ones are flagged) |
+| `GET /api/months/{year}/{month}` | A month's paydays, the bills under each, left over and the split |
+| `PUT /api/bills/{id}/status` | `{"status": "Complete"}` (or `Pending`, `NotPaid`) |
+| `PUT /api/bills/{id}/payday` | `{"payPeriodId": 12}` moves a bill to another paycheck in its month (`null` for Not assigned) |
+| `POST /api/months/{id}/even-out` | Even out's suggestions. Changes nothing |
+| `POST /api/months/{id}/moves` | `{"moves": [{"expenseId": 5, "payPeriodId": 12}]}` applies the moves you keep |
+| `GET`/`PUT /api/settings` | Buffer and leftover split |
+| `GET /api/debt-plan` | Loans, the chosen payoff plan, and every strategy compared |
+| `GET /api/categories`, `/api/recurring-bills`, `/api/income` | The lists from the site |
+
+Archived months are read-only: changes come back as `409` with a message. The request and response shapes live in `src/BudgetApp.Core/Contracts`, so the phone app can reference the Core library and use the same classes.
+
+## Project layout
+
+- `src/BudgetApp`: the website (pages, database, AI helper).
+- `src/BudgetApp.Core`: the shared library. Models, pay schedules, bill frequencies, Even out and the debt planner live here so a phone app can use the same rules.
+- `tests/BudgetApp.Core.Tests`: unit tests for the shared rules. Run them with `dotnet test`.
+
 ## Changing the data model
 
 ```
@@ -141,5 +202,5 @@ Database__Provider=MySql dotnet ef migrations add <Name> -p src/BudgetApp
 
 ## Notes
 
-- There is no login. It's meant to run on your own computer or home network; add ASP.NET Core Identity before exposing it to the internet.
+- Put the site behind HTTPS before using it over the internet, since passwords and phone app tokens travel with every request.
 - A paycheck belongs to the month its payday falls in, so a weekly paycheck shows up four or five times depending on the month.
