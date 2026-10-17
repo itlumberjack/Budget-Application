@@ -287,14 +287,19 @@ public class BudgetBuilder(BudgetDbContext db)
         if (total <= 0) return;
 
         // Each loan's balance at the start of this month, as the payoff plan projects it from today's balances.
-        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
+        var inputs = loans.Select(d => d.ToDebtInput()).ToList();
         var startBalances = DebtPlanner.StartBalances(inputs, settings, first, budget.Year, budget.Month);
-        // What a loan can still take this month: its balance less the minimum payment and any extra already paid.
         var paidExtra = budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid)
             .GroupBy(e => e.ExtraForDebtId!.Value).ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
-        var targets = DebtPlanner.Order(inputs, settings.Strategy)
-            .Select(d => (d.Id, Capacity: Math.Max(0, startBalances.GetValueOrDefault(d.Id) - d.MinPayment - paidExtra.GetValueOrDefault(d.Id))))
-            .Where(d => d.Capacity > 0).ToList();
+        // First the loans the payoff plan sends extra to this month (a promo that has to be cleared in time comes
+        // first), up to what the plan gives each; then the strategy's order, up to what each loan still owes.
+        var monthIndex = (budget.Year - first.Year) * 12 + budget.Month - first.Month;
+        var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.ExtraMonthly, first, settings.OneTimeAmount, settings.OneTimeMonth);
+        var planned = monthIndex < plan.Schedule.Count ? plan.Schedule[monthIndex].Extra : new Dictionary<int, decimal>();
+        var targets = planned.Select(x => (Id: x.Key, Capacity: Math.Max(0, x.Value - paidExtra.GetValueOrDefault(x.Key)))).ToList();
+        targets.AddRange(DebtPlanner.Order(inputs, settings.Strategy).Select(d => (d.Id, Capacity: Math.Max(0,
+            startBalances.GetValueOrDefault(d.Id) - d.MinPayment - paidExtra.GetValueOrDefault(d.Id) - planned.GetValueOrDefault(d.Id)))));
+        targets = targets.Where(t => t.Capacity > 0).ToList();
         if (targets.Count == 0) return;
 
         var view = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget };

@@ -84,6 +84,39 @@ public class RecurringDebt
     [DataType(DataType.Date)]
     public DateTime? BalanceAsOf { get; set; }
 
+    /// <summary>A promotional rate (often 0%) until <see cref="PromoEndDate"/>, as a percent.</summary>
+    [Column(TypeName = "decimal(6,3)")]
+    [Range(0, 100)]
+    [Display(Name = "Promo rate (APR %)")]
+    public decimal? PromoRate { get; set; }
+
+    /// <summary>How much of the amount owed is under the promo. Empty means all of it.</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    [Range(0, 100_000_000)]
+    [DataType(DataType.Currency)]
+    [Display(Name = "Promo balance")]
+    public decimal? PromoBalance { get; set; }
+
+    [DataType(DataType.Date)]
+    [Display(Name = "Promo ends")]
+    public DateTime? PromoEndDate { get; set; }
+
+    /// <summary>
+    /// "No interest if paid in full": when the promo ends with any of it unpaid, all the interest since the
+    /// promo started is charged.
+    /// </summary>
+    [Display(Name = "Deferred interest (all interest is charged back if not paid off in time)")]
+    public bool PromoDeferredInterest { get; set; }
+
+    /// <summary>The promo terms for the payoff plan, while the promo hasn't ended.</summary>
+    [NotMapped]
+    public PromoTerms? Promo => PromoEndDate is DateTime end && end.Date >= DateTime.Today
+        ? new PromoTerms(PromoRate ?? 0, PromoBalance, end.Date, PromoDeferredInterest)
+        : null;
+
+    /// <summary>This loan as it goes into a payoff plan.</summary>
+    public DebtInput ToDebtInput() => new(Id, Title, Balance ?? 0, InterestRate ?? 0, MonthlyAmount, PayoffPriority, Promo);
+
     [NotMapped]
     public bool IsLoan => Kind == BillKind.Loan && Balance > 0;
 
@@ -95,6 +128,15 @@ public class RecurringDebt
         InterestRate = null;
         PayoffPriority = null;
         BalanceAsOf = null;
+        ClearPromo();
+    }
+
+    public void ClearPromo()
+    {
+        PromoRate = null;
+        PromoBalance = null;
+        PromoEndDate = null;
+        PromoDeferredInterest = false;
     }
 
     /// <summary>What the bill costs in an average month (a weekly bill comes 52 times a year).</summary>

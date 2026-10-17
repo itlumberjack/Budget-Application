@@ -1,0 +1,109 @@
+@model BudgetApp.Services.StatementFindings
+@{
+    var loan = (RecurringDebt)ViewBag.Loan;
+    ViewData["Title"] = $"Statement for {loan.Title}";
+    // The promo picked by default: the one ending soonest.
+    var promos = Model.Promos.Select((p, i) => (Promo: p, Index: i)).OrderBy(x => x.Promo.EndDate ?? DateTime.MaxValue).ToList();
+    var firstPromo = promos.FirstOrDefault(x => x.Promo.EndDate is not null);
+    string Money(decimal? v) => v is decimal d ? d.ToString("C") : "—";
+    string Rate(decimal? v) => v is decimal d ? d.ToString("0.###") + "%" : "—";
+}
+
+<div class="mx-auto" style="max-width:40rem">
+<a asp-action="Edit" asp-route-id="@loan.Id" class="small text-decoration-none"><i class="bi bi-chevron-left"></i> Back to @loan.Title</a>
+<h1 class="mt-1 mb-1">@ViewData["Title"]</h1>
+<p class="text-muted mb-3">
+    @(Model.Lender ?? loan.Company)@(Model.StatementDate is DateTime sd ? $" · statement dated {sd:MMMM d, yyyy}" : "")
+</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Summary))
+{
+    <div class="alert alert-info d-flex gap-2" id="statementSummary"><i class="bi bi-stars"></i><div>@Model.Summary</div></div>
+}
+
+<form asp-action="ApplyStatement" method="post" class="card"><div class="card-body p-3 p-md-4">
+    <input type="hidden" name="id" value="@loan.Id" />
+    <input type="hidden" name="statementDate" value="@Model.StatementDate?.ToString("yyyy-MM-dd")" />
+    <p class="small text-muted">Check what to keep. You can fix a number before saving.</p>
+    <table class="table align-middle mb-3" id="statementFields">
+        <thead><tr><th></th><th>On the statement</th><th class="text-end">On @loan.Title now</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" name="useBalance" value="true" id="useBalance" checked="@(Model.Balance is not null && Model.Balance != loan.Balance)" disabled="@(Model.Balance is null)" />
+                    <label class="form-check-label" for="useBalance">Amount owed</label></div></td>
+                <td><div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control" name="balance" type="number" step="0.01" value="@Model.Balance?.ToString("0.00")" /></div></td>
+                <td class="text-end money">@Money(loan.Balance)</td>
+            </tr>
+            <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" name="useApr" value="true" id="useApr" checked="@(Model.Apr is not null && Model.Apr != loan.InterestRate)" disabled="@(Model.Apr is null)" />
+                    <label class="form-check-label" for="useApr">Interest rate (regular APR)</label></div></td>
+                <td><div class="input-group input-group-sm"><input class="form-control" name="apr" type="number" step="0.001" value="@Model.Apr?.ToString("0.###")" /><span class="input-group-text">%</span></div></td>
+                <td class="text-end">@Rate(loan.InterestRate)</td>
+            </tr>
+            <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" name="useMinimum" value="true" id="useMinimum" checked="@(Model.MinimumPayment is decimal m && m > 0 && m != loan.Amount)" disabled="@(Model.MinimumPayment is null)" />
+                    <label class="form-check-label" for="useMinimum">Monthly payment</label></div>
+                    @if (Model.DueDate is DateTime due) { <div class="small text-muted ms-4">due @due.ToString("MMM d")</div> }</td>
+                <td><div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control" name="minimum" type="number" step="0.01" value="@Model.MinimumPayment?.ToString("0.00")" /></div></td>
+                <td class="text-end money">@loan.Amount.ToString("C")</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="h6">Promotional rate</h2>
+    @if (loan.PromoEndDate is DateTime currentEnd)
+    {
+        <p class="small text-muted mb-2">Now: @Rate(loan.PromoRate) until @currentEnd.ToString("MMM d, yyyy")@(loan.PromoBalance is decimal pb ? $" on {pb:C}" : "")@(loan.PromoDeferredInterest ? ", deferred interest" : "").</p>
+    }
+    <div class="list-group mb-3" id="promoChoices">
+        @foreach (var (p, i) in promos)
+        {
+            var pick = firstPromo.Promo == p && p.EndDate is not null;
+            <label class="list-group-item d-flex gap-2 align-items-start">
+                <input class="form-check-input mt-1" type="radio" name="promoPick" value="@i" checked="@pick" disabled="@(p.EndDate is null)"
+                       data-rate="@p.Rate.ToString("0.###")" data-balance="@p.Balance?.ToString("0.00")" data-end="@p.EndDate?.ToString("yyyy-MM-dd")" data-deferred="@(p.DeferredInterest ? "1" : "")" />
+                <span>
+                    <strong>@p.Description</strong>
+                    <span class="d-block small">@Rate(p.Rate)@(p.Balance is decimal b ? $" on {b:C}" : "")@(p.EndDate is DateTime e ? $" until {e:MMMM d, yyyy}" : " (no end date shown)")</span>
+                    @if (p.DeferredInterest) { <span class="badge text-bg-warning">Deferred interest</span> }
+                </span>
+            </label>
+        }
+        <label class="list-group-item d-flex gap-2">
+            <input class="form-check-input mt-1" type="radio" name="promoPick" value="keep" checked="@(firstPromo.Promo is null)" />
+            <span>@(loan.PromoEndDate is null ? "No promo" : "Keep the promo as it is")</span>
+        </label>
+        @if (loan.PromoEndDate is not null)
+        {
+            <label class="list-group-item d-flex gap-2">
+                <input class="form-check-input mt-1" type="radio" name="promoPick" value="clear" />
+                <span>Remove the promo (it's over)</span>
+            </label>
+        }
+    </div>
+    <input type="hidden" name="promo" /><input type="hidden" name="promoRate" /><input type="hidden" name="promoBalance" />
+    <input type="hidden" name="promoEnd" /><input type="hidden" name="promoDeferred" />
+    @if (Model.Promos.Count > 1) { <p class="form-text">A loan keeps one promo in its plan; pick the one to plan around (usually the one ending first).</p> }
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Save to @loan.Title</button>
+        <a asp-action="Edit" asp-route-id="@loan.Id" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</div></form>
+</div>
+
+@section Scripts {
+    <script>
+        // The picked promo's terms go in the hidden fields the save reads.
+        document.querySelector('form[action*="ApplyStatement"]').addEventListener('submit', e => {
+            const f = e.target, picked = f.querySelector('input[name=promoPick]:checked');
+            const v = picked ? picked.value : 'keep';
+            f.elements['promo'].value = /^\d+$/.test(v) ? 'use' : v;
+            const d = picked && /^\d+$/.test(v) ? picked.dataset : {};
+            f.elements['promoRate'].value = d.rate || '';
+            f.elements['promoBalance'].value = d.balance || '';
+            f.elements['promoEnd'].value = d.end || '';
+            f.elements['promoDeferred'].value = d.deferred ? 'true' : 'false';
+        });
+    </script>
+}

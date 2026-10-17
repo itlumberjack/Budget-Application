@@ -24,7 +24,7 @@ public class DebtPageModel
     /// </summary>
     public static DebtPageModel Build(List<RecurringDebt> loans, DebtPlanSettings settings)
     {
-        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
+        var inputs = loans.Select(d => d.ToDebtInput()).ToList();
         var firstMonth = Dates.ThisMonth.AddMonths(1);
 
         PayoffPlan Run(PayoffStrategy s) =>

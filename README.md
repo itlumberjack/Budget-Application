@@ -170,6 +170,21 @@ Debt Payoff; later months start from the plan's projected balance. Debt Payoff s
 Loans used to have a weekly or every-two-weeks option. Any loan still on one of those schedules goes back to
 one monthly payment when the site starts.
 
+### Promos and reading a statement
+
+A loan can have a promo: a rate (often 0%), an end date, an optional promo balance (blank means all of it),
+and whether it is *deferred interest* (miss the date and the interest from the start is charged back). The
+payoff plan charges the promo rate on that part and puts extra on each promo first, soonest end date first, so
+it is paid off before the promo ends. Payments are assumed to come off the regular part first. *Promo
+deadlines* on Debt Payoff says the month each promo is cleared, or how much is left at the end, the monthly
+amount it would take, and any deferred interest that would be charged. A promo stops counting once its date
+passes.
+
+On a loan's page, *Read a statement* takes a PDF or photo (JPG, PNG, WEBP or GIF, up to 20 MB) and the AI helper
+reads the amount owed, APR, minimum payment and any promos. You review it next to the loan's current numbers
+and pick what to save and which promo to plan around. The file is sent to the AI and not stored. This uses the
+same `Anthropic:ApiKey` as the AI helper.
+
 ## AI helper (optional)
 
 The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and

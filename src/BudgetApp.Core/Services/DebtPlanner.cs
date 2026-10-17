@@ -35,16 +35,37 @@ public static class DebtPlanner
         var payoffMonth = new Dictionary<int, int>();
         var schedule = new List<ScheduleMonth>();
 
+        // Promos: the part of each balance still under its promo rate, and what deferred interest would add up to.
+        var promos = debts.Where(d => d.Promo is not null && d.Promo.EndDate >= firstMonth).ToDictionary(d => d.Id, d => d.Promo!);
+        var promoLeft = promos.ToDictionary(p => p.Key, p => Math.Min(p.Value.Balance ?? balance[p.Key], balance[p.Key]));
+        var promoStart = new Dictionary<int, decimal>(promoLeft);
+        var deferred = promos.Keys.ToDictionary(id => id, _ => 0m);
+        var deferredCharged = promos.Keys.ToDictionary(id => id, _ => 0m);
+        var promoCleared = new Dictionary<int, DateTime>();
+        var leftAtEnd = new Dictionary<int, decimal>();
+        // Months of payments left before a promo ends, counting the month it ends in.
+        int MonthsLeft(PromoTerms promo, DateTime month) => (promo.EndDate.Year - month.Year) * 12 + promo.EndDate.Month - month.Month + 1;
+
         for (var n = 1; n <= MaxMonths && balance.Values.Any(b => b > 0); n++)
         {
             var month = firstMonth.AddMonths(n - 1);
             var open = ordered.Where(d => balance[d.Id] > 0).ToList();
             var payments = open.ToDictionary(d => d.Id, _ => 0m);
+            var extra = new Dictionary<int, decimal>();
             decimal interestThisMonth = 0;
 
             foreach (var d in open)
             {
-                var interest = Math.Round(balance[d.Id] * d.Apr / 1200m, 2);
+                var regular = balance[d.Id];
+                decimal interest = 0;
+                if (promos.TryGetValue(d.Id, out var promo) && MonthsLeft(promo, month) >= 1 && promoLeft[d.Id] > 0)
+                {
+                    var promoPart = Math.Min(promoLeft[d.Id], regular);
+                    regular -= promoPart;
+                    interest += Math.Round(promoPart * promo.Rate / 1200m, 2);
+                    if (promo.DeferredInterest) deferred[d.Id] += Math.Round(promoPart * d.Apr / 1200m, 2);
+                }
+                interest += Math.Round(regular * d.Apr / 1200m, 2);
                 balance[d.Id] += interest;
                 interestPaid[d.Id] += interest;
                 interestThisMonth += interest;
@@ -55,26 +76,58 @@ public static class DebtPlanner
             if (snowballOn && oneTimeAmount > 0 && oneTimeMonth is DateTime otm && otm.Year == month.Year && otm.Month == month.Month)
                 pool += oneTimeAmount;
 
-            foreach (var d in open)
+            void Pay(DebtInput d, decimal amount, bool isExtra)
             {
-                var pay = Math.Min(d.MinPayment, balance[d.Id]);
-                payments[d.Id] += pay;
-                balance[d.Id] -= pay;
-                pool -= pay;
+                if (amount <= 0) return;
+                payments[d.Id] += amount;
+                balance[d.Id] -= amount;
+                pool -= amount;
+                if (isExtra) extra[d.Id] = extra.GetValueOrDefault(d.Id) + amount;
+                // Payments come off the promo part last, so the higher-rate part goes first.
+                if (promoLeft.ContainsKey(d.Id)) promoLeft[d.Id] = Math.Min(promoLeft[d.Id], balance[d.Id]);
             }
+
+            foreach (var d in open)
+                Pay(d, Math.Min(d.MinPayment, balance[d.Id]), false);
             var snowball = 0m;
             if (snowballOn)
             {
+                // First, enough to clear each promo balance by the time its promo ends (soonest deadline first).
+                foreach (var d in open.Where(d => promos.ContainsKey(d.Id) && promoLeft[d.Id] > 0 && MonthsLeft(promos[d.Id], month) >= 1)
+                             .OrderBy(d => promos[d.Id].EndDate))
+                {
+                    if (pool <= 0) break;
+                    var owedThisMonth = balance[d.Id] + payments[d.Id]; // before this month's minimum
+                    var needed = Math.Ceiling(owedThisMonth / MonthsLeft(promos[d.Id], month) * 100) / 100 - payments[d.Id];
+                    var pay = Math.Min(pool, Math.Min(Math.Max(0, needed), balance[d.Id]));
+                    Pay(d, pay, true);
+                    snowball += pay;
+                }
                 foreach (var d in open)
                 {
                     if (pool <= 0) break;
                     var pay = Math.Min(pool, balance[d.Id]);
                     if (pay <= 0) continue;
-                    payments[d.Id] += pay;
-                    balance[d.Id] -= pay;
-                    pool -= pay;
+                    Pay(d, pay, true);
                     snowball += pay;
                 }
+            }
+
+            // A promo that ends this month: note whether it was cleared, and charge deferred interest if not.
+            foreach (var (id, promo) in promos)
+            {
+                if (!promoCleared.ContainsKey(id) && !leftAtEnd.ContainsKey(id) && promoLeft[id] <= 0 && MonthsLeft(promo, month) >= 1)
+                    promoCleared[id] = month;
+                if (MonthsLeft(promo, month) != 1 || promoCleared.ContainsKey(id)) continue;
+                leftAtEnd[id] = promoLeft[id];
+                if (promo.DeferredInterest && promoLeft[id] > 0)
+                {
+                    balance[id] += deferred[id];
+                    interestPaid[id] += deferred[id];
+                    interestThisMonth += deferred[id];
+                    deferredCharged[id] = deferred[id];
+                }
+                promoLeft[id] = 0;
             }
 
             foreach (var d in open.Where(d => balance[d.Id] <= 0))
@@ -83,7 +136,7 @@ public static class DebtPlanner
                 payoffMonth[d.Id] = n;
             }
             schedule.Add(new ScheduleMonth(n, month, payments, new Dictionary<int, decimal>(balance),
-                interestThisMonth, snowball, balance.Values.Sum()));
+                interestThisMonth, snowball, balance.Values.Sum()) { Extra = extra });
         }
 
         var paysOff = balance.Values.All(b => b <= 0);
@@ -91,8 +144,17 @@ public static class DebtPlanner
             payoffMonth.TryGetValue(d.Id, out var m) ? m : null,
             payoffMonth.TryGetValue(d.Id, out var m2) ? firstMonth.AddMonths(m2 - 1) : null,
             interestPaid[d.Id])).ToList();
+        var checks = promos.Select(p =>
+        {
+            var d = debts.First(x => x.Id == p.Key);
+            var months = Math.Max(1, MonthsLeft(p.Value, firstMonth));
+            var cleared = promoCleared.TryGetValue(p.Key, out var when) ? when : (DateTime?)null;
+            return new PromoCheck(d.Id, d.Name, promoStart[p.Key], p.Value.Rate, p.Value.EndDate, p.Value.DeferredInterest,
+                cleared, cleared is not null, Math.Ceiling(d.Balance / months * 100) / 100,
+                leftAtEnd.GetValueOrDefault(p.Key), deferredCharged[p.Key]);
+        }).ToList();
         return new PayoffPlan(strategy, monthlyPayment, outcomes, schedule,
-            interestPaid.Values.Sum(), schedule.Sum(s => s.Payments.Values.Sum()), paysOff);
+            interestPaid.Values.Sum(), schedule.Sum(s => s.Payments.Values.Sum()), paysOff) { Promos = checks };
     }
 
     /// <summary>
