@@ -58,22 +58,13 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
         var old = isNew ? null : await db.RecurringDebts.AsNoTracking().Where(d => d.Id == debt.Id).Select(d => new { d.Balance, d.Kind, d.PaidFromIncomeSourceId }).FirstOrDefaultAsync();
         if (debt.Balance != old?.Balance) debt.BalanceAsOf = debt.Balance is null ? null : DateTime.Today;
 
-        // A monthly loan that's new (or just became a loan) joins the Debt Payoff page's weekly or every-two-weeks
-        // payments; the amount entered is the monthly payment it's split from.
-        var plan = await db.GetDebtPlanAsync();
-        var joinsSchedule = debt.Kind == BillKind.Loan && old?.Kind != BillKind.Loan
-            && debt.Frequency == BillFrequency.Monthly && plan.PaymentFrequency != BillFrequency.Monthly;
-        if (joinsSchedule) debt.ChangePaymentSchedule(plan.PaymentFrequency, plan.PaymentStartDate);
-        var scheduleNote = joinsSchedule
-            ? $" Like your other loans it's paid {(plan.PaymentFrequency == BillFrequency.Weekly ? "weekly" : "every two weeks")}: {debt.Amount:C} each time."
-            : "";
         if (isNew) db.RecurringDebts.Add(debt);
         else db.RecurringDebts.Update(debt);
         await db.SaveChangesAsync();
         if (isNew)
         {
             await builder.AddToCurrentAndFutureMonthsAsync(debt: debt);
-            TempData["Message"] = $"Added {debt.Title}. It's now in this month's budget and every month after." + scheduleNote;
+            TempData["Message"] = $"Added {debt.Title}. It's now in this month's budget and every month after.";
         }
         else
         {
@@ -81,12 +72,13 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             var months = db.MonthlyBudgets.FromThisMonth().Select(b => b.Id);
             await db.BudgetExpenses.Where(e => e.RecurringDebtId == debt.Id && months.Contains(e.MonthlyBudgetId))
                 .ExecuteUpdateAsync(u => u.SetProperty(e => e.IsFixed, debt.IsFixed));
-            if (joinsSchedule) await builder.RescheduleAsync([debt.Id]);
             // A new choice of whose payday moves its unpaid copies in this month and later ones.
             if (old is not null && old.PaidFromIncomeSourceId != debt.PaidFromIncomeSourceId)
                 await builder.PlaceCopiesAsync(debt.Id);
-            TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts." + scheduleNote;
+            TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts.";
         }
+        // Loans decide where the Debt Payoff page's extra payment goes, so it's spread again.
+        if (debt.Kind == BillKind.Loan || old?.Kind == BillKind.Loan) await builder.SpreadDebtExtraAsync();
         return RedirectToAction(nameof(Index));
     }
 

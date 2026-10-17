@@ -77,7 +77,7 @@
                         <span class="input-group-text">$</span>
                         <input class="form-control" id="extraMonthly" name="extraMonthly" type="number" step="0.01" min="0" inputmode="decimal" value="@Model.Settings.ExtraMonthly.ToString("0.##")" />
                     </div>
-                    <div class="form-text">On top of the minimums. This is the starting snowball; each paid-off debt's minimum is added to it.</div>
+                    <div class="form-text">On top of the minimums. It's spread over each month's paydays (more from the paydays with more left over, so they end up about even) and goes to the first loan in the strategy's order.</div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -93,21 +93,30 @@
                     </div>
                     <div class="form-text">Like a tax refund or a bonus.</div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label" for="paymentFrequency">Pay loans</label>
-                    <select class="form-select" id="paymentFrequency" name="paymentFrequency">
-                        <option value="Monthly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.Monthly)">Once a month</option>
-                        <option value="BiWeekly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.BiWeekly)">Every two weeks (half each time)</option>
-                        <option value="Weekly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.Weekly)">Every week (a quarter each time)</option>
-                    </select>
-                    <div id="paymentStartGroup" class="mt-2">
-                        <label class="form-label" for="paymentStartDate">First payment</label>
-                        <input class="form-control" id="paymentStartDate" name="paymentStartDate" type="date" value="@(((DateTime)ViewBag.PaymentStart).ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="form-text">Splitting the monthly payment adds up to 13 monthly payments a year, so loans are paid off sooner. Each month's budget gets the payments on these dates.</div>
-                </div>
                 <div class="d-grid"><button class="btn btn-primary">Update plan</button></div>
             </form>
+            @{
+                var extras = (List<BudgetExpense>)ViewBag.ExtraThisMonth;
+                var thisMonth = (MonthlyBudget?)ViewBag.ThisMonth;
+            }
+            @if (extras.Count > 0)
+            {
+                <h3 class="h6 mt-4 mb-2" id="extraByPayday">Extra by payday in @thisMonth!.Title</h3>
+                <table class="table table-sm small mb-1">
+                    <tbody>
+                    @foreach (var e in extras)
+                    {
+                        <tr class="@(e.Status == PaymentStatus.Complete ? "text-success" : "")">
+                            <td class="text-nowrap">@(e.PayPeriod is { } p ? p.PayDate.ToString("MMM d") : "Not assigned")</td>
+                            <td>@(e.ExtraForDebt?.Title ?? e.Title.Replace("Extra: ", ""))</td>
+                            <td class="text-end money">@e.Amount.ToString("C")</td>
+                        </tr>
+                    }
+                    </tbody>
+                    <tfoot><tr class="fw-semibold"><td colspan="2">Total</td><td class="text-end money">@extras.Sum(e => e.Amount).ToString("C")</td></tr></tfoot>
+                </table>
+                <div class="form-text">Change a payday's amount on the <a href="@Url.RouteUrl("month", new { year = thisMonth.Year, month = thisMonth.Month })">month page</a>. Saving here spreads the unpaid ones again.</div>
+            }
         </div></div>
     </div>
 
@@ -147,14 +156,6 @@
                             {
                                 <div class="fs-5 fw-semibold text-success">Minimums alone never pay it off</div>
                             }
-                        </div>
-                    }
-                    @if (Model.PaidMonthly is { PaysOff: true } monthly && plan.PaysOff)
-                    {
-                        <div id="scheduleSavings">
-                            <div class="text-muted small">Compared with paying monthly</div>
-                            <div class="fs-5 fw-semibold text-success money">@((monthly.TotalInterest - plan.TotalInterest).ToString("C")) less interest</div>
-                            <div class="text-success small">@Dates.YearsAndMonths(Math.Max(0, monthly.Months - plan.Months)) sooner</div>
                         </div>
                     }
                 </div>
@@ -309,13 +310,3 @@
         <button class="btn btn-outline-primary mt-3">Save amounts owed</button>
     </form>
 </div></div>
-
-@section Scripts {
-    <script>
-        // Weekly and every-two-weeks payments count from a first payment date.
-        const paymentFrequency = document.getElementById('paymentFrequency');
-        const showStart = () => document.getElementById('paymentStartGroup').hidden = paymentFrequency.value === 'Monthly';
-        paymentFrequency?.addEventListener('change', showStart);
-        if (paymentFrequency) showStart();
-    </script>
-}

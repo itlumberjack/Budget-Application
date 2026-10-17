@@ -79,6 +79,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (budget is null) return NotFound();
         if (Archived(budget, out var locked)) return locked;
         var (pay, debts) = await builder.SyncAsync(id);
+        await builder.SpreadDebtExtraAsync(id);
         TempData["Message"] = pay + debts == 0
             ? "Nothing new to add. This month already has every paycheck and recurring bill."
             : $"Added {pay} paycheck(s) and {debts} recurring bill(s).";
