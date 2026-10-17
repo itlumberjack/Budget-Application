@@ -95,6 +95,16 @@ same amount left over. A bill only moves to a payday on or before its due day (o
 so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
 **Apply selected**.
 
+## Changing a bill on one month
+
+Tap a bill on a month page to edit it. For a recurring bill, **Also change the ones after this** (on by default)
+saves the change to the bill on Bills & Expenses and to its unpaid copies after this one: later the same month
+for weekly and every-two-weeks bills, and in every later month. Name, company, amount, category and the
+mandatory switch carry over, and so does the due day for a monthly bill, which also moves each copy to the
+payday before its new due date. Copies already pending or complete are left as they are. Turn the switch off
+to change only this one. On a share of the extra debt payment, the switch makes this month's extra total the
+new **Extra each month** on Debt Payoff and spreads it over later months' paydays.
+
 ## Plan vs now
 
 Each month keeps its original plan. The plan is saved the first time a bill in that month is marked pending or

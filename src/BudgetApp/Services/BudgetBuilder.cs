@@ -222,16 +222,50 @@ public class BudgetBuilder(BudgetDbContext db)
     });
 
     /// <summary>
+    /// Copies a recurring bill's name, company, amount, category and mandatory switch (and due day, for a
+    /// monthly bill) to its unpaid copies in the months after the given one, so a change made on one month
+    /// carries forward. A weekly or every-two-weeks bill's later copies in the same month change too (those due
+    /// after fromDay). Archived months and copies already pending or complete are left alone. A new due day
+    /// puts each copy back under the payday before it's due.
+    /// </summary>
+    public Task CarryForwardAsync(int debtId, int year, int month, int? fromDay, bool dueDayChanged) => Exclusive(async () =>
+    {
+        var debt = await db.RecurringDebts.FindAsync(debtId);
+        if (debt is null) return;
+        var paidFrom = await PaidFromAsync();
+        var sameMonth = debt.Frequency != BillFrequency.Monthly;
+        var months = await db.MonthlyBudgets.Where(b => b.Year > year || (b.Year == year && b.Month > month) || (sameMonth && b.Year == year && b.Month == month))
+            .Where(b => !b.IsArchived)
+            .Where(b => b.Expenses.Any(e => e.RecurringDebtId == debtId))
+            .Include(b => b.PayPeriods).Include(b => b.Expenses).ToListAsync();
+        foreach (var later in months)
+            foreach (var copy in later.Expenses.Where(e => e.RecurringDebtId == debtId && e.Status == PaymentStatus.NotPaid
+                         && (later.Year != year || later.Month != month || (e.DueDay ?? 0) > (fromDay ?? 0))))
+            {
+                copy.Title = debt.Title;
+                copy.Company = debt.Company;
+                copy.Amount = debt.Amount;
+                copy.CategoryId = debt.CategoryId;
+                copy.IsFixed = debt.IsFixed;
+                if (debt.Frequency != BillFrequency.Monthly) continue;
+                copy.DueDay = debt.DueDay;
+                if (dueDayChanged) copy.PayPeriodId = PickPayPeriod(copy, later.PayPeriods, later.Year, later.Month, paidFrom)?.Id;
+            }
+        await db.SaveChangesAsync();
+    });
+
+    /// <summary>
     /// Spreads the Debt Payoff page's extra monthly payment (plus any one-time extra that month) over the
     /// paydays of this month and later ones, or just one month. Paydays with more left over give more, so they
     /// end up about even, and each share goes to the loans in the payoff strategy's order using their projected
     /// balances. Shares already marked pending or complete are kept and count toward the month's total; the
     /// rest are redone. In this month, paydays that have already passed are skipped while a later one is left.
     /// </summary>
-    public Task SpreadDebtExtraAsync(int? budgetId = null) => Exclusive(async () =>
+    public Task SpreadDebtExtraAsync(int? budgetId = null, (int Year, int Month)? after = null) => Exclusive(async () =>
     {
         var ids = budgetId is int id ? [id]
-            : await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived).Select(b => b.Id).ToListAsync();
+            : await (after is var (y, m) ? db.MonthlyBudgets.After(y, m) : db.MonthlyBudgets.FromThisMonth())
+                .Where(b => !b.IsArchived).Select(b => b.Id).ToListAsync();
         foreach (var month in ids) await SpreadDebtExtraCoreAsync(month);
     });
 

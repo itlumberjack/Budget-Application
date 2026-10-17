@@ -268,7 +268,8 @@
                                 .Where(x => x.c != col && Model.CanMoveTo(x.c, e)).Select(x => x.i));
                             <tr class="clickable status-@e.Status.ToString().ToLower()" draggable="@(targets != "" ? "true" : "false")" data-targets="@targets" data-bs-toggle="modal" data-bs-target="#expenseModal" data-mode="edit"
                                 data-id="@e.Id" data-title="@e.Title" data-company="@e.Company" data-amount="@e.Amount.ToString("0.00")"
-                                data-due="@e.DueDay" data-category="@e.CategoryId" data-pay="@e.PayPeriodId" data-status="@e.Status" data-fixed="@(e.IsFixed ? "1" : "")">
+                                data-due="@e.DueDay" data-category="@e.CategoryId" data-pay="@e.PayPeriodId" data-status="@e.Status" data-fixed="@(e.IsFixed ? "1" : "")"
+                                data-kind="@(e.ExtraForDebtId is not null ? "snowball" : e.RecurringDebtId is not null ? "recurring" : "")">
                                 <td>
                                     @e.Title
                                     @if (e.DueDay is int due) { <span class="text-muted small">(@Dates.Ordinal(due))</span> }
@@ -475,7 +476,11 @@
                     <input class="form-check-input" type="checkbox" role="switch" name="isFixed" value="true" id="expenseFixed" />
                     <label class="form-check-label" for="expenseFixed">Fixed to this payday</label>
                 </div>
-                <div class="form-text mt-2" id="expenseNote">Changes apply to @Model.Title only.</div>
+                <div class="form-check form-switch mt-2" id="forwardGroup">
+                    <input class="form-check-input" type="checkbox" role="switch" name="applyForward" value="true" id="expenseForward" checked />
+                    <label class="form-check-label" for="expenseForward" id="forwardLabel">Also change the ones after this</label>
+                </div>
+                <div class="form-text mt-2" id="expenseNote"></div>
             </div>
             <div class="modal-footer">
                 <button type="submit" class="btn btn-outline-danger me-auto" id="expenseDelete" formaction="@Url.Action("DeleteExpense")"
@@ -733,6 +738,19 @@
             form.elements['categoryId'].value = d.category;
             form.elements['status'].value = isAdd ? 'NotPaid' : d.status;
             form.elements['isFixed'].checked = !isAdd && d.fixed === '1';
+            // Recurring bills and shares of the extra debt payment can carry a change on to later months.
+            const kind = isAdd ? '' : d.kind;
+            document.getElementById('forwardGroup').hidden = !kind;
+            form.elements['applyForward'].checked = !!kind;
+            const forwardNote = {
+                recurring: 'On: the bill on Bills & Expenses and its unpaid copies after this one (later this month for weekly bills, and in later months) change too. Off: this one only.',
+                snowball: "On: this month's extra total becomes the monthly extra on Debt Payoff, spread over later months' paydays. Off: @Model.Title only."
+            };
+            const showNote = () => document.getElementById('expenseNote').textContent = !kind
+                ? 'Changes apply to @Model.Title only.'
+                : form.elements['applyForward'].checked ? forwardNote[kind] : 'Changes apply to @Model.Title only.';
+            form.elements['applyForward'].onchange = showNote;
+            showNote();
             // A column can hold more than one paycheck; select the column that holds this bill's paycheck.
             const pay = d.pay || '';
             const option = [...form.elements['payPeriodId'].options].find(o => o.value === pay || (o.dataset.all || '').split(',').includes(pay));
