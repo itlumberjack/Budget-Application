@@ -124,6 +124,15 @@ Each month, every debt is charged interest (balance × APR ÷ 12) and paid its m
 monthly payment (the snowball) goes to the first unpaid debt in the strategy's order. When a debt is
 paid off, its minimum is added to the snowball.
 
+### Paying loans weekly or every two weeks
+
+Under **Pay loans** on Debt Payoff, pick *Every two weeks* or *Every week* and the first payment date (it
+suggests the next weekly payday). Each loan is then paid half its monthly payment every two weeks, or a
+quarter every week. That adds up to 13 monthly payments a year, so the plan shows how much sooner and
+cheaper it is than paying monthly. Every loan on Bills & Expenses switches to the schedule, new loans join
+it, and this month's and later budgets are rebuilt with the payments on those dates. Payments already marked
+pending or complete stay as they are. Switching back to *Once a month* restores the monthly payment and due day.
+
 ## AI helper (optional)
 
 The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and

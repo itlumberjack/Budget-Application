@@ -184,6 +184,27 @@ public class BudgetBuilder(BudgetDbContext db)
     }
 
     /// <summary>
+    /// After bills change schedule (loans switched to weekly payments, say), redoes their copies in this month's
+    /// and later months' budgets. A month where one of those bills is already pending or complete keeps its copies
+    /// of that bill as they are, so nothing paid is lost or paid twice. Archived months are left alone.
+    /// </summary>
+    public Task RescheduleAsync(IReadOnlyCollection<int> debtIds) => Exclusive(async () =>
+    {
+        var debts = await db.RecurringDebts.Where(d => debtIds.Contains(d.Id) && d.IsActive).ToListAsync();
+        var months = await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived).Include(b => b.Expenses).ToListAsync();
+        foreach (var month in months)
+        {
+            var redo = debts
+                .Where(d => month.Expenses.Where(e => e.RecurringDebtId == d.Id).All(e => e.Status == PaymentStatus.NotPaid))
+                .ToList();
+            var ids = redo.Select(d => d.Id).ToHashSet();
+            db.BudgetExpenses.RemoveRange(month.Expenses.Where(e => e.RecurringDebtId is int id && ids.Contains(id)));
+            await db.SaveChangesAsync();
+            await SyncCoreAsync(month.Id, [], redo);
+        }
+    });
+
+    /// <summary>
     /// After the budget rules change, moves paychecks in this month's and later months' budgets to the
     /// month the rules now put them in (bringing their bills along), then fills in any paydays that now
     /// belong to each month. Older months are left as they are.

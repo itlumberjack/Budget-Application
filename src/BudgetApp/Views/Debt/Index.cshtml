@@ -93,6 +93,19 @@
                     </div>
                     <div class="form-text">Like a tax refund or a bonus.</div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label" for="paymentFrequency">Pay loans</label>
+                    <select class="form-select" id="paymentFrequency" name="paymentFrequency">
+                        <option value="Monthly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.Monthly)">Once a month</option>
+                        <option value="BiWeekly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.BiWeekly)">Every two weeks (half each time)</option>
+                        <option value="Weekly" selected="@(Model.Settings.PaymentFrequency == BillFrequency.Weekly)">Every week (a quarter each time)</option>
+                    </select>
+                    <div id="paymentStartGroup" class="mt-2">
+                        <label class="form-label" for="paymentStartDate">First payment</label>
+                        <input class="form-control" id="paymentStartDate" name="paymentStartDate" type="date" value="@(((DateTime)ViewBag.PaymentStart).ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="form-text">Splitting the monthly payment adds up to 13 monthly payments a year, so loans are paid off sooner. Each month's budget gets the payments on these dates.</div>
+                </div>
                 <div class="d-grid"><button class="btn btn-primary">Update plan</button></div>
             </form>
         </div></div>
@@ -134,6 +147,14 @@
                             {
                                 <div class="fs-5 fw-semibold text-success">Minimums alone never pay it off</div>
                             }
+                        </div>
+                    }
+                    @if (Model.PaidMonthly is { PaysOff: true } monthly && plan.PaysOff)
+                    {
+                        <div id="scheduleSavings">
+                            <div class="text-muted small">Compared with paying monthly</div>
+                            <div class="fs-5 fw-semibold text-success money">@((monthly.TotalInterest - plan.TotalInterest).ToString("C")) less interest</div>
+                            <div class="text-success small">@Dates.YearsAndMonths(Math.Max(0, monthly.Months - plan.Months)) sooner</div>
                         </div>
                     }
                 </div>
@@ -288,3 +309,13 @@
         <button class="btn btn-outline-primary mt-3">Save amounts owed</button>
     </form>
 </div></div>
+
+@section Scripts {
+    <script>
+        // Weekly and every-two-weeks payments count from a first payment date.
+        const paymentFrequency = document.getElementById('paymentFrequency');
+        const showStart = () => document.getElementById('paymentStartGroup').hidden = paymentFrequency.value === 'Monthly';
+        paymentFrequency?.addEventListener('change', showStart);
+        if (paymentFrequency) showStart();
+    </script>
+}

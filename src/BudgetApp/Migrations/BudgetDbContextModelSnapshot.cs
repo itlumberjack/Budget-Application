@@ -195,6 +195,12 @@ namespace BudgetApp.Migrations
                     b.Property<DateTime?>("OneTimeMonth")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int>("PaymentFrequency")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PaymentStartDate")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("Strategy")
                         .HasColumnType("int");
 
@@ -208,6 +214,7 @@ namespace BudgetApp.Migrations
                             Id = 1,
                             ExtraMonthly = 0m,
                             OneTimeAmount = 0m,
+                            PaymentFrequency = 0,
                             Strategy = 1
                         });
                 });

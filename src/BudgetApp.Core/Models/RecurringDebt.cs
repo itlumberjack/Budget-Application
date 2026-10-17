@@ -98,6 +98,39 @@ public class RecurringDebt
         _ => Amount
     };
 
+    /// <summary>The monthly payment a weekly (quarter) or every-two-weeks (half) loan payment was split from.</summary>
+    [NotMapped]
+    public decimal MonthlyPaymentBeforeSplit => Frequency switch
+    {
+        BillFrequency.Weekly => Amount * 4,
+        BillFrequency.BiWeekly => Amount * 2,
+        _ => Amount
+    };
+
+    /// <summary>
+    /// Puts a loan on the Debt Payoff page's payment schedule: monthly, half the monthly payment every two weeks,
+    /// or a quarter of it every week (rounded up to the cent). Going back to monthly keeps the old due day, or
+    /// uses the first payment's day of the month.
+    /// </summary>
+    public void ChangePaymentSchedule(BillFrequency frequency, DateTime? firstPayment)
+    {
+        var monthly = MonthlyPaymentBeforeSplit;
+        Amount = frequency switch
+        {
+            BillFrequency.Weekly => Math.Ceiling(monthly * 100 / 4) / 100,
+            BillFrequency.BiWeekly => Math.Ceiling(monthly * 100 / 2) / 100,
+            _ => monthly
+        };
+        if (frequency == BillFrequency.Monthly)
+        {
+            DueDay ??= StartDate?.Day;
+            StartDate = null;
+        }
+        else
+            StartDate = (firstPayment ?? DateTime.Today).Date;
+        Frequency = frequency;
+    }
+
     /// <summary>
     /// The days this bill is due in a month: one for a monthly bill (or none set), and every week or
     /// every other week from the first due date for the others. Nothing before the first due date.

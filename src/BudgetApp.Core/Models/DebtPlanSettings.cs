@@ -16,4 +16,13 @@ public class DebtPlanSettings : ISingleRow
     [Column(TypeName = "decimal(12,2)")]
     public decimal OneTimeAmount { get; set; }
     public DateTime? OneTimeMonth { get; set; }
+
+    /// <summary>
+    /// How often loans are paid. Every two weeks pays half the monthly payment each time, and weekly a quarter,
+    /// which adds up to 13 monthly payments a year. Each loan on Bills &amp; Expenses follows this schedule.
+    /// </summary>
+    public BillFrequency PaymentFrequency { get; set; } = BillFrequency.Monthly;
+
+    /// <summary>The first weekly or every-two-weeks payment; later ones are counted from it.</summary>
+    public DateTime? PaymentStartDate { get; set; }
 }

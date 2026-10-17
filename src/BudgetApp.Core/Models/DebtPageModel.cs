@@ -9,6 +9,12 @@ public class DebtPageModel
     public DebtPlanSettings Settings { get; init; } = new();
     public PayoffPlan? Plan { get; set; }
     public PayoffPlan? MinimumOnly { get; set; }
+
+    /// <summary>
+    /// With weekly or every-two-weeks payments: the same plan paid monthly instead, to show what the
+    /// schedule saves.
+    /// </summary>
+    public PayoffPlan? PaidMonthly { get; set; }
     public List<PayoffPlan> Comparison { get; set; } = new();
 
     public decimal TotalOwed => Loans.Sum(l => l.Balance ?? 0);
@@ -38,6 +44,11 @@ public class DebtPageModel
             // Reuse the comparison's runs rather than simulating the same plans again.
             model.Plan = model.Comparison.FirstOrDefault(p => p.Strategy == settings.Strategy) ?? Run(settings.Strategy);
             model.MinimumOnly = model.Comparison.First(p => p.Strategy == PayoffStrategy.MinimumOnly);
+            if (loans.Any(l => l.Frequency != BillFrequency.Monthly))
+            {
+                var monthly = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyPaymentBeforeSplit, d.PayoffPriority)).ToList();
+                model.PaidMonthly = DebtPlanner.Plan(monthly, settings.Strategy, settings.ExtraMonthly, firstMonth, settings.OneTimeAmount, settings.OneTimeMonth);
+            }
         }
         return model;
     }
