@@ -297,6 +297,9 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (status != PaymentStatus.NotPaid) await months.SavePlanAsync(budget.Id, onlyIfMissing: true);
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
         expense.Company = company.TrimToNull();
+        // A share of the extra payment changed by hand keeps its amount when the month's extra is spread again.
+        var reshare = expense.ExtraForDebtId is not null && expense.Amount != amount;
+        if (reshare) expense.ExtraPinned = true;
         expense.Amount = amount;
         var oldDue = expense.DueDay;
         var oldPay = expense.PayPeriodId;
@@ -310,7 +313,24 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         expense.IsFixed = isFixed;
         await db.SaveChangesAsync();
         if (applyForward) await CarryForwardAsync(expense, budget);
+        else if (reshare) await RebalanceExtraAsync($"Saved {expense.Title}.", budget);
         return RedirectToMonth(budget);
+    }
+
+    /// <summary>
+    /// After a share of the extra payment is changed or removed, the month's other paydays make up the difference
+    /// so the month still pays the extra set on Debt Payoff.
+    /// </summary>
+    private async Task RebalanceExtraAsync(string done, MonthlyBudget budget)
+    {
+        await builder.SpreadDebtExtraAsync(budget.Id);
+        var settings = await db.GetDebtPlanAsync();
+        var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
+        var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
+        var target = settings.ExtraMonthly + oneTime;
+        TempData["Message"] = Math.Abs(monthTotal - target) < 0.01m
+            ? $"{done} The other paydays were adjusted so {budget.Title} still pays {target:C} extra."
+            : $"{done} {budget.Title} now pays {monthTotal:C} extra instead of {target:C}; no other payday had room to make up the difference.";
     }
 
     /// <summary>
@@ -392,6 +412,15 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
         if (Archived(expense.MonthlyBudget!, out var locked)) return locked;
+        if (expense.ExtraForDebtId is not null && expense.Status == PaymentStatus.NotPaid)
+        {
+            // A removed share stays as $0 so respreading leaves this payday out, and the other paydays make it up.
+            expense.Amount = 0;
+            expense.ExtraPinned = true;
+            await db.SaveChangesAsync();
+            await RebalanceExtraAsync($"Removed this payday's {expense.Title}.", expense.MonthlyBudget!);
+            return RedirectToMonth(expense.MonthlyBudget!);
+        }
         db.BudgetExpenses.Remove(expense);
         await db.SaveChangesAsync();
         return RedirectToMonth(expense.MonthlyBudget!);

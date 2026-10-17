@@ -38,9 +38,9 @@ public class MonthViewModel
             current.Paychecks.Add(pay);
         }
         foreach (var column in columns)
-            column.Expenses.AddRange(Budget.Expenses.Where(e => column.Paychecks.Any(p => p.Id == e.PayPeriodId)));
+            column.Expenses.AddRange(Budget.Expenses.Where(e => !e.IsRemovedExtra && column.Paychecks.Any(p => p.Id == e.PayPeriodId)));
 
-        var unassigned = Budget.Expenses.Where(e => e.PayPeriodId is null).ToList();
+        var unassigned = Budget.Expenses.Where(e => e.PayPeriodId is null && !e.IsRemovedExtra).ToList();
         if (unassigned.Count > 0 || columns.Count == 0)
             columns.Add(new PayColumn { Expenses = unassigned });
         return columns;

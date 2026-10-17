@@ -745,14 +745,15 @@
             // Recurring bills and shares of the extra debt payment can carry a change on to later months.
             const kind = isAdd ? '' : d.kind;
             document.getElementById('forwardGroup').hidden = !kind;
-            form.elements['applyForward'].checked = !!kind;
+            form.elements['applyForward'].checked = kind === 'recurring';
             const forwardNote = {
                 recurring: 'On: the bill on Bills & Expenses and its unpaid copies after this one (later this month for weekly bills, and in later months) change too. Off: this one only.',
-                snowball: "On: this month's extra total becomes the monthly extra on Debt Payoff, spread over later months' paydays. Off: @Model.Title only."
+                snowball: "On: this month's new extra total becomes the monthly extra on Debt Payoff, spread over later months' paydays."
             };
+            const offNote = { snowball: "A new amount here: the other paydays in @Model.Title make up the difference, so the month still pays the extra set on Debt Payoff." };
             const showNote = () => document.getElementById('expenseNote').textContent = !kind
                 ? 'Changes apply to @Model.Title only.'
-                : form.elements['applyForward'].checked ? forwardNote[kind] : 'Changes apply to @Model.Title only.';
+                : form.elements['applyForward'].checked ? forwardNote[kind] : (offNote[kind] || 'Changes apply to @Model.Title only.');
             form.elements['applyForward'].onchange = showNote;
             showNote();
             // A column can hold more than one paycheck; select the column that holds this bill's paycheck.

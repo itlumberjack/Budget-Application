@@ -169,7 +169,13 @@ that have already passed are skipped.
 
 Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid
 shares again. Shares marked pending or complete are kept and count toward that month's total. You can change a
-share's amount on the month page. The Debt Payoff page lists this month's shares under *Extra by payday*.
+share's amount on the month page, or remove it: the month's other paydays make up the difference so the month
+still pays the extra set on Debt Payoff, and the changed payday keeps its amount when the extra is spread again.
+Turn on *Also change later months* in that dialog to make the month's new total the monthly extra instead.
+
+The snowball goes to one loan at a time: all the extra goes to the first loan in the strategy's order, and moves
+on only once it's paid off (the rest of that month's extra goes to the next loan). A loan with a promo the plan
+would otherwise miss moves to the front of the line. The Debt Payoff page lists this month's shares under *Extra by payday*.
 
 Next to each loan payment and extra share on a month page is what's left on that loan after it ("$250 left",
 or "paid off"), counting that month's payments in payday order. This month starts from the amount owed on
@@ -183,8 +189,8 @@ one monthly payment when the site starts.
 
 A loan can have a promo: a rate (often 0%), an end date, an optional promo balance (blank means all of it),
 and whether it is *deferred interest* (miss the date and the interest from the start is charged back). The
-payoff plan charges the promo rate on that part and puts extra on each promo first, soonest end date first, so
-it is paid off before the promo ends. Payments are assumed to come off the regular part first. *Promo
+payoff plan charges the promo rate on that part, and if the strategy's order wouldn't clear the promo before it
+ends, that loan moves to the front of the snowball (soonest end date first). Payments are assumed to come off the regular part first. *Promo
 deadlines* on Debt Payoff says the month each promo is cleared, or how much is left at the end, the monthly
 amount it would take, and any deferred interest that would be charged. A promo stops counting once its date
 passes.

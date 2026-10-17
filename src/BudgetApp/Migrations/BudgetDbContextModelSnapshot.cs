@@ -41,6 +41,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("ExtraForDebtId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("ExtraPinned")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("IsFixed")
                         .HasColumnType("tinyint(1)");
 

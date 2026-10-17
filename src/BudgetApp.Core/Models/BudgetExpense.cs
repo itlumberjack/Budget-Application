@@ -48,4 +48,14 @@ public class BudgetExpense
     /// </summary>
     public int? ExtraForDebtId { get; set; }
     public RecurringDebt? ExtraForDebt { get; set; }
+
+    /// <summary>
+    /// A share of the extra payment whose amount was set by hand. Respreading keeps it and lets the month's
+    /// other paydays make up the difference. Removing a share sets it to $0 and keeps it, so it stays removed.
+    /// </summary>
+    public bool ExtraPinned { get; set; }
+
+    /// <summary>A removed share of the extra payment, kept only so respreading leaves its payday out.</summary>
+    [NotMapped]
+    public bool IsRemovedExtra => ExtraForDebtId is not null && ExtraPinned && Amount == 0;
 }
