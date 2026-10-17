@@ -5,12 +5,15 @@ A personal budget app built with ASP.NET Core MVC (.NET 10) and MySQL.
 ## Pages
 
 - **Pay & Schedule**: each paycheck's take-home pay and schedule (weekly, every two weeks, twice a month, or monthly on a set day or the last day).
-- **Recurring Debts**: bills that repeat every month, each with a title, amount, category and optional due day.
+- **Bills & Expenses**: everything that repeats every month, week or two weeks. Each item has a type:
+  - **Bill**: utilities, cell phone, insurance, subscriptions.
+  - **Living expense**: food, gas and other spending that comes every week or two. New ones start weekly and mandatory.
+  - **Loan**: mortgage, car loan, credit card. Only loans have an amount owed, interest rate and payoff priority, and only loans show on Debt Payoff.
 - **Monthly Budgets**: one page per month (`/budget/2026/10`), built automatically the first time you open it, laid out like the family budget spreadsheet: one column per payday, with Income at the top of each column, then a section per category (Item | Company | Amount | Total), then what's left over from that paycheck. Paydays a few days apart (Sept 30 and Oct 2) share a column. On the month page you can:
   - click any row to edit it, move it to another payday, or remove it; click **+ add** in a section to add an extra expense (extra credit card payment, kids pictures);
   - click **+ extra** in an Income section to add a bonus or overtime to a paycheck, or click a paycheck to change its amount or date;
   - click the dot at the end of a row to cycle its status: **Not paid** (white), **Pending** (yellow), **Complete** (green, the money has come out of your account);
-  - new paychecks and recurring debts are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
+  - new paychecks and recurring bills are added to this month and later months automatically; **Add missing items** also pulls in anything else missing, and to place any "Not assigned" bills under a payday. It never overwrites what you already changed.
 
   New bills go under the last paycheck on or before their due day, or the month's first paycheck if they have no due day.
 - **Brad's rule** (top of Pay & Schedule, two switches): *End-of-month paychecks pay next month's bills* puts monthly pay that lands on the last day of the month into the next month's budget. *Weekly payday closest to the 1st starts the month* puts the last weekly payday of a month into the next month when it's at least as close to the 1st as the next payday is (October 30 vs. November 6 means October 30 goes to November; on a tie the earlier payday wins). Switching a rule moves paychecks in this month and later months (and last month's end-of-month check) to where the rule puts them, bills included.
@@ -53,7 +56,7 @@ Data entered in testing mode does not carry over to MySQL.
 
 - A recurring bill can be **monthly** (with a due day), **weekly** or **every two weeks**. For the last two,
   give any date it's due; each month gets a copy for every week (or every other week) from then on. The
-  Recurring Debts page totals what a typical month costs (a weekly bill counts 52 times a year).
+  Bills & Expenses page totals what a typical month costs (a weekly bill counts 52 times a year).
 - Budgets are always built through **six months ahead**. This happens when the app starts and whenever you
   open Monthly Budgets or a month, so new months appear on their own.
 - When a month is over it's **archived**: it moves to the Archive list at the bottom of Monthly Budgets and
@@ -62,7 +65,7 @@ Data entered in testing mode does not carry over to MySQL.
 
 ## Fixed and flexible bills
 
-Each bill on Recurring Debts has a **Fixed to its payday** switch. Fixed bills (weekly groceries, say)
+Each item on Bills & Expenses has a **Mandatory: stays on its payday** switch. Fixed bills (weekly groceries, say)
 stay on the payday they fall under; Even out and the AI helper only ever move flexible ones. Weekly and
 every-two-weeks bills start out fixed, monthly bills start out flexible, and a single month's copy can be
 switched in its edit dialog. On the month page fixed bills show a pin, and a warning triangle marks any
@@ -96,8 +99,8 @@ Bills it was covering move to the month's other paydays. A paycheck moved this w
 
 ## Debt payoff
 
-Give a bill on **Recurring Debts** an amount owed and an interest rate (under *Loan or credit card
-details*) and it becomes a loan. Its monthly amount is used as the minimum payment. The **Debt Payoff**
+Add a **Loan** on **Bills & Expenses** (or use *Add a loan* on Debt Payoff) with an amount owed and an
+interest rate. Its monthly amount is used as the minimum payment. The **Debt Payoff**
 page then shows:
 
 - Totals: amount owed, minimum payments, average rate (weighted by balance) and this month's interest.

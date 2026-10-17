@@ -311,7 +311,7 @@
         <div class="card p-3 h-100 d-flex flex-column gap-2 justify-content-center">
             <form asp-action="Sync" method="post" class="d-grid edit-only">
                 <input type="hidden" name="id" value="@b.Id" />
-                <button class="btn btn-outline-primary" title="Adds paychecks and recurring debts that are missing from this month, and puts unassigned bills under a payday. Lines already here are left alone."><i class="bi bi-arrow-repeat me-1"></i> Add missing items</button>
+                <button class="btn btn-outline-primary" title="Adds paychecks and recurring bills that are missing from this month, and puts unassigned bills under a payday. Lines already here are left alone."><i class="bi bi-arrow-repeat me-1"></i> Add missing items</button>
             </form>
             @if (!b.IsArchived)
             {

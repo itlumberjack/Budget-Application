@@ -10,7 +10,7 @@
         <h1 class="mb-1">Debt Payoff</h1>
         <p class="page-subtitle mb-0">Your loans and cards, and how fast different payoff plans clear them.</p>
     </div>
-    <a asp-controller="RecurringDebts" asp-action="Create" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i> Add a loan</a>
+    <a asp-controller="RecurringDebts" asp-action="Create" asp-route-kind="Loan" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i> Add a loan</a>
 </div>
 
 @if (Model.Loans.Count == 0)
@@ -18,8 +18,8 @@
     <div class="card empty-state mx-auto" style="max-width:36rem">
         <i class="bi bi-graph-down-arrow"></i>
         <h2 class="h5 mt-2">No loans yet</h2>
-        <p class="text-muted">Open a bill on <a asp-controller="RecurringDebts" asp-action="Index">Recurring Debts</a> (your car payment, a credit card, a student loan), and fill in <strong>Loan or credit card details</strong> with the amount owed and the interest rate. Its monthly amount is used as the minimum payment.</p>
-        <div><a asp-controller="RecurringDebts" asp-action="Index" class="btn btn-primary">Go to Recurring Debts</a></div>
+        <p class="text-muted">Add your car payment, credit cards or student loans on <a asp-controller="RecurringDebts" asp-action="Index">Bills &amp; Expenses</a> with <strong>Loan</strong> as the type, and fill in the amount owed and the interest rate. Its monthly amount is used as the minimum payment.</p>
+        <div><a asp-controller="RecurringDebts" asp-action="Index" class="btn btn-primary">Go to Bills &amp; Expenses</a></div>
     </div>
     return;
 }

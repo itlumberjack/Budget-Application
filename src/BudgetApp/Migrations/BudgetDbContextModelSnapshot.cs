@@ -409,6 +409,9 @@ namespace BudgetApp.Migrations
                     b.Property<bool>("IsFixed")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
                     b.Property<int?>("PayoffPriority")
                         .HasColumnType("int");
 

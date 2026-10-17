@@ -80,8 +80,8 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (Archived(budget, out var locked)) return locked;
         var (pay, debts) = await builder.SyncAsync(id);
         TempData["Message"] = pay + debts == 0
-            ? "Nothing new to add. This month already has every paycheck and recurring debt."
-            : $"Added {pay} paycheck(s) and {debts} recurring debt(s).";
+            ? "Nothing new to add. This month already has every paycheck and recurring bill."
+            : $"Added {pay} paycheck(s) and {debts} recurring bill(s).";
         return RedirectToMonth(budget);
     }
 

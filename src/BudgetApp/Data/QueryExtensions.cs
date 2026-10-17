@@ -31,7 +31,7 @@ public static class QueryExtensions
     public static IQueryable<Category> InDisplayOrder(this IQueryable<Category> categories) =>
         categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name);
 
-    /// <summary>Active bills with an amount owed, for the Debt Payoff page.</summary>
+    /// <summary>Active loans with an amount owed, for the Debt Payoff page.</summary>
     public static IQueryable<RecurringDebt> Loans(this IQueryable<RecurringDebt> debts) =>
-        debts.Where(d => d.IsActive && d.Balance > 0).OrderBy(d => d.Id);
+        debts.Where(d => d.IsActive && d.Kind == BillKind.Loan && d.Balance > 0).OrderBy(d => d.Id);
 }

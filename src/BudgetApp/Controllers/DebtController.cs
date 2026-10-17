@@ -33,7 +33,7 @@ public class DebtController(BudgetDbContext db) : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateBalances(Dictionary<int, decimal> balances)
     {
-        var debts = await db.RecurringDebts.Where(d => balances.Keys.Contains(d.Id)).ToListAsync();
+        var debts = await db.RecurringDebts.Where(d => d.Kind == BillKind.Loan && balances.Keys.Contains(d.Id)).ToListAsync();
         foreach (var d in debts)
         {
             var value = Math.Max(0, balances[d.Id]);
