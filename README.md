@@ -72,6 +72,11 @@ switched in its edit dialog. On the month page fixed bills show a pin, and a war
 bill whose payday comes after its due date (for example a bill due the 1st when the first paycheck is the 2nd;
 Brad's rule can fix that by moving the end-of-month paycheck forward).
 
+A mandatory item can also say **whose payday** it stays on. Pick a person (say, food from Jessica's weekly
+check) and every unpaid copy goes under that person's last paycheck before it's due, in this month and
+later ones. Leave it on "Anyone's" to use whichever paycheck comes before the due date. Turning Mandatory
+off clears the choice.
+
 Even out and the AI helper never move a bill to a payday after its due date. A monthly bill is added to a
 month once; only bills you add on the month page can repeat.
 

@@ -422,6 +422,9 @@ namespace BudgetApp.Migrations
                     b.Property<int>("Kind")
                         .HasColumnType("int");
 
+                    b.Property<int?>("PaidFromIncomeSourceId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("PayoffPriority")
                         .HasColumnType("int");
 
@@ -436,6 +439,8 @@ namespace BudgetApp.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("PaidFromIncomeSourceId");
 
                     b.ToTable("RecurringDebts");
                 });
@@ -719,7 +724,14 @@ namespace BudgetApp.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("BudgetApp.Models.IncomeSource", "PaidFrom")
+                        .WithMany()
+                        .HasForeignKey("PaidFromIncomeSourceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Category");
+
+                    b.Navigation("PaidFrom");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

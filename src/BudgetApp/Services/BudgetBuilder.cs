@@ -176,8 +176,9 @@ public class BudgetBuilder(BudgetDbContext db)
             }
         }
 
+        var paidFrom = await PaidFromAsync();
         foreach (var expense in budget.Expenses.Where(e => e.PayPeriodId is null))
-            expense.PayPeriodId = PickPayPeriod(budget.PayPeriods, budget.Year, budget.Month, expense.DueDay)?.Id;
+            expense.PayPeriodId = PickPayPeriod(expense, budget.PayPeriods, budget.Year, budget.Month, paidFrom)?.Id;
 
         await db.SaveChangesAsync();
         return (addedPay, addedDebts);
@@ -311,8 +312,9 @@ public class BudgetBuilder(BudgetDbContext db)
         // Re-home the old month's bills that were under this paycheck.
         var oldMonth = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstAsync(b => b.Id == from.Id);
         var remaining = oldMonth.PayPeriods.Where(p => p.Id != pay.Id).ToList();
+        var paidFrom = await PaidFromAsync();
         foreach (var e in oldMonth.Expenses.Where(e => e.PayPeriodId == pay.Id))
-            e.PayPeriodId = PickPayPeriod(remaining, oldMonth.Year, oldMonth.Month, e.DueDay)?.Id;
+            e.PayPeriodId = PickPayPeriod(e, remaining, oldMonth.Year, oldMonth.Month, paidFrom)?.Id;
 
         pay.MonthlyBudgetId = to.Id;
         pay.ManuallyMoved = manual && await NaturalMonthAsync(pay) != to.FirstDay;
@@ -322,13 +324,47 @@ public class BudgetBuilder(BudgetDbContext db)
         var newMonth = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses).FirstAsync(b => b.Id == to.Id);
         foreach (var e in newMonth.Expenses.Where(e => e.Status == PaymentStatus.NotPaid))
         {
-            var pick = PickPayPeriod(newMonth.PayPeriods, newMonth.Year, newMonth.Month, e.DueDay);
-            if (pick is not null && pick.PayDate.Date == pay.PayDate.Date)
+            var pick = PickPayPeriod(e, newMonth.PayPeriods, newMonth.Year, newMonth.Month, paidFrom);
+            var tiedElsewhere = e.RecurringDebtId is int debtId && paidFrom.TryGetValue(debtId, out var sourceId) && sourceId != pay.IncomeSourceId;
+            if (pick is not null && pick.PayDate.Date == pay.PayDate.Date && !tiedElsewhere)
                 e.PayPeriodId = pay.Id;
         }
         await db.SaveChangesAsync();
         return to;
     }
+
+    /// <summary>Recurring bills tied to one person's paychecks: bill id to income source id.</summary>
+    private async Task<Dictionary<int, int>> PaidFromAsync() =>
+        await db.RecurringDebts.Where(d => d.PaidFromIncomeSourceId != null)
+            .ToDictionaryAsync(d => d.Id, d => d.PaidFromIncomeSourceId!.Value);
+
+    /// <summary>
+    /// The paycheck a month's bill should come out of. A bill tied to one person's paychecks only looks at
+    /// theirs (unless they have none this month); otherwise any paycheck will do.
+    /// </summary>
+    public static PayPeriod? PickPayPeriod(BudgetExpense bill, IEnumerable<PayPeriod> payPeriods, int year, int month, IReadOnlyDictionary<int, int> paidFrom)
+    {
+        var pays = payPeriods.ToList();
+        if (bill.RecurringDebtId is int debtId && paidFrom.TryGetValue(debtId, out var sourceId) && pays.Any(p => p.IncomeSourceId == sourceId))
+            pays = pays.Where(p => p.IncomeSourceId == sourceId).ToList();
+        return PickPayPeriod(pays, year, month, bill.DueDay);
+    }
+
+    /// <summary>
+    /// After a bill is tied to someone's paychecks (or untied), puts its unpaid copies in this month's and
+    /// later budgets under the paycheck it now belongs to. Archived months are left alone.
+    /// </summary>
+    public Task PlaceCopiesAsync(int debtId) => Exclusive(async () =>
+    {
+        var paidFrom = await PaidFromAsync();
+        var months = await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived)
+            .Where(b => b.Expenses.Any(e => e.RecurringDebtId == debtId))
+            .Include(b => b.PayPeriods).Include(b => b.Expenses).ToListAsync();
+        foreach (var month in months)
+            foreach (var copy in month.Expenses.Where(e => e.RecurringDebtId == debtId && e.Status == PaymentStatus.NotPaid))
+                copy.PayPeriodId = PickPayPeriod(copy, month.PayPeriods, month.Year, month.Month, paidFrom)?.Id;
+        await db.SaveChangesAsync();
+    });
 
     /// <summary>
     /// The paycheck a bill should come out of: the last payday on or before its due day,

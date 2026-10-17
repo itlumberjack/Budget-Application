@@ -77,6 +77,17 @@
         <label asp-for="IsFixed" class="form-check-label"></label>
         <div class="form-text">Turn on for things that have to come out of every payday they fall on, like weekly groceries or gas. Even out and the AI helper only move items that are off (flexible).</div>
     </div>
+    <div class="mb-3 ms-md-4" id="paidFromGroup">
+        <label asp-for="PaidFromIncomeSourceId" class="form-label"></label>
+        <select asp-for="PaidFromIncomeSourceId" class="form-select">
+            <option value="">Anyone's: the payday before it's due</option>
+            @foreach (var s in (List<IncomeSource>)ViewBag.IncomeSources)
+            {
+                <option value="@s.Id">@s.Name's</option>
+            }
+        </select>
+        <div class="form-text">Pick a person to always pay this from their paycheck, like food from a weekly check. It goes under their last payday before it's due.</div>
+    </div>
     <fieldset class="loan-details border rounded p-3 mb-3" id="loanGroup">
         <legend class="fs-6 fw-semibold float-none w-auto px-1 mb-0"><i class="bi bi-bank me-1"></i> Loan details</legend>
         <p class="form-text">With an amount owed, the loan shows up on <a asp-controller="Debt" asp-action="Index">Debt Payoff</a> with payoff plans.</p>
@@ -140,7 +151,11 @@
         const isFixed = document.getElementById('IsFixed');
         let fixedTouched = @(Model.Id != 0 ? "true" : "false");
         isFixed.addEventListener('change', () => fixedTouched = true);
-        billFrequency.addEventListener('change', () => { if (!fixedTouched) isFixed.checked = billFrequency.value !== '0'; });
+        // Whose payday only matters for mandatory items.
+        const showPaidFrom = () => document.getElementById('paidFromGroup').hidden = !isFixed.checked;
+        isFixed.addEventListener('change', showPaidFrom);
+        showPaidFrom();
+        billFrequency.addEventListener('change', () => { if (!fixedTouched) isFixed.checked = billFrequency.value !== '0'; showPaidFrom(); });
         showSchedule();
 
         // Only loans have loan details. Hidden fields are disabled so they aren't sent (or checked) when saving.
@@ -154,6 +169,7 @@
             if (picked && isNew && kind === 'LivingExpense' && billFrequency.value === '0') {
                 billFrequency.value = '1'; showSchedule();
                 if (!fixedTouched) isFixed.checked = true;
+                showPaidFrom();
             }
         };
         document.querySelectorAll('input[name=Kind]').forEach(r => r.addEventListener('change', () => showKind(true)));
