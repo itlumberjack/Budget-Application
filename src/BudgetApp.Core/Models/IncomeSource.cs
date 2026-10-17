@@ -46,4 +46,19 @@ public class IncomeSource
 
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
+
+    /// <summary>The latest check stub read for this paycheck: its pay date, employer and gross pay. Null before one is read.</summary>
+    [DataType(DataType.Date)]
+    public DateTime? StubPayDate { get; set; }
+
+    [StringLength(100)]
+    public string? StubEmployer { get; set; }
+
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal? StubGross { get; set; }
+
+    /// <summary>That stub's earnings, taxes and deductions.</summary>
+    public List<PayStubLine> StubLines { get; set; } = new();
+
+    public decimal StubTotal(StubLineKind kind) => StubLines.Where(l => l.Kind == kind).Sum(l => l.Amount);
 }

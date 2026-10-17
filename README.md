@@ -52,6 +52,15 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Check stubs
+
+Each paycheck on Pay & Schedule (and its edit page) has *Read a check stub*. Pick a PDF or photo of a recent stub
+and the AI helper breaks it down: gross pay, earnings lines, before-tax deductions, taxes, after-tax deductions
+and take-home pay, with year-to-date amounts. A warning shows if the lines don't add up to the take-home pay.
+You can make the stub's take-home the paycheck's amount, and by default its upcoming paydays in months already
+built change too (paydays before today keep theirs). The breakdown stays on the paycheck's card; the file
+itself isn't stored. Uses the same `Anthropic:ApiKey` as the AI helper.
+
 ## Weekly bills, six months ahead, and the archive
 
 - A recurring bill can be **monthly** (with a due day), **weekly** or **every two weeks**. For the last two,

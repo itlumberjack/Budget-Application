@@ -293,6 +293,16 @@ namespace BudgetApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<string>("StubEmployer")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<decimal?>("StubGross")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("StubPayDate")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<decimal>("TakeHomeAmount")
                         .HasColumnType("decimal(12,2)");
 
@@ -397,6 +407,36 @@ namespace BudgetApp.Migrations
                     b.HasIndex("PayPeriodId");
 
                     b.ToTable("PayPeriodExtras");
+                });
+
+            modelBuilder.Entity("BudgetApp.Models.PayStubLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("IncomeSourceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<decimal?>("YearToDate")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeSourceId");
+
+                    b.ToTable("PayStubLine");
                 });
 
             modelBuilder.Entity("BudgetApp.Models.RecurringDebt", b =>
@@ -752,6 +792,15 @@ namespace BudgetApp.Migrations
                     b.Navigation("PayPeriod");
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.PayStubLine", b =>
+                {
+                    b.HasOne("BudgetApp.Models.IncomeSource", null)
+                        .WithMany("StubLines")
+                        .HasForeignKey("IncomeSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BudgetApp.Models.RecurringDebt", b =>
                 {
                     b.HasOne("BudgetApp.Models.Category", "Category")
@@ -819,6 +868,11 @@ namespace BudgetApp.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetApp.Models.IncomeSource", b =>
+                {
+                    b.Navigation("StubLines");
                 });
 
             modelBuilder.Entity("BudgetApp.Models.MonthlyBudget", b =>
