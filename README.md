@@ -4,7 +4,7 @@ A personal budget app built with ASP.NET Core MVC (.NET 10) and MySQL.
 
 ## Pages
 
-- **Pay & Schedule**: each paycheck's take-home pay and schedule (weekly, every two weeks, twice a month, or monthly on a set day or the last day).
+- **Pay & Schedule**: each paycheck's take-home pay and schedule (weekly, every two weeks, twice a month, or monthly on a set day or the last day). Pay on the last day of the month comes on the last business day: when the 31st is a weekend, payday is the Friday before (a switch on each paycheck turns this off). Holidays aren't counted.
 - **Bills & Expenses**: everything that repeats every month, week or two weeks. Each item has a type:
   - **Bill**: utilities, cell phone, insurance, subscriptions.
   - **Living expense**: food, gas and other spending that comes every week or two. New ones start weekly and mandatory.

@@ -38,3 +38,47 @@ public class PayScheduleTests
         Assert.Equal(new DateTime(2026, 10, 1), PaySchedule.BudgetMonthFor(Jessica, new DateTime(2026, 10, 23), rules));
     }
 }
+
+public class MonthEndBusinessDayTests
+{
+    private static IncomeSource Brad(bool businessDay = true) =>
+        new() { Name = "Brad", Frequency = PayFrequency.Monthly, MonthEndOnBusinessDay = businessDay };
+
+    [Theory]
+    [InlineData(2026, 10, 30)] // Oct 31, 2026 is a Saturday
+    [InlineData(2027, 1, 29)]  // Jan 31, 2027 is a Sunday
+    [InlineData(2026, 11, 30)] // Nov 30, 2026 is a Monday
+    [InlineData(2026, 12, 31)] // Dec 31, 2026 is a Thursday
+    public void Last_day_pay_moves_to_the_Friday_before_a_weekend(int year, int month, int day) =>
+        Assert.Equal([new DateTime(year, month, day)], PaySchedule.PaydaysInMonth(Brad(), year, month));
+
+    [Fact]
+    public void Can_still_pay_on_the_weekend_last_day()
+    {
+        Assert.Equal([new DateTime(2026, 10, 31)], PaySchedule.PaydaysInMonth(Brad(businessDay: false), 2026, 10));
+    }
+
+    [Fact]
+    public void A_set_day_of_month_is_not_moved()
+    {
+        var source = Brad();
+        source.DayOfMonth = 17; // Oct 17, 2026 is a Saturday
+        Assert.Equal([new DateTime(2026, 10, 17)], PaySchedule.PaydaysInMonth(source, 2026, 10));
+    }
+
+    [Fact]
+    public void Twice_a_month_moves_its_second_check()
+    {
+        var source = new IncomeSource { Frequency = PayFrequency.SemiMonthly };
+        Assert.Equal([new DateTime(2026, 10, 15), new DateTime(2026, 10, 30)], PaySchedule.PaydaysInMonth(source, 2026, 10));
+    }
+
+    [Fact]
+    public void Brads_rule_still_sends_the_early_Friday_check_to_next_month()
+    {
+        var rules = new BudgetRules { EndOfMonthPayGoesToNextMonth = true };
+        Assert.Equal(new DateTime(2026, 11, 1), PaySchedule.BudgetMonthFor(Brad(), new DateTime(2026, 10, 30), rules));
+        Assert.Equal([new DateTime(2026, 10, 30)], PaySchedule.PaydaysForBudget(Brad(), 2026, 11, rules));
+        Assert.Equal([new DateTime(2026, 9, 30)], PaySchedule.PaydaysForBudget(Brad(), 2026, 10, rules));
+    }
+}

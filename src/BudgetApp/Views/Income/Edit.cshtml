@@ -40,6 +40,11 @@
         <input asp-for="DayOfMonth" class="form-control" placeholder="Leave empty for the last day of the month" />
         <span asp-validation-for="DayOfMonth" class="text-danger"></span>
     </div>
+    <div class="form-check mb-3" id="business-day-group">
+        <input asp-for="MonthEndOnBusinessDay" class="form-check-input" />
+        <label asp-for="MonthEndOnBusinessDay" class="form-check-label"></label>
+        <div class="form-text">For pay on the last day of the month. If the 31st is a Sunday, payday is Friday the 29th.</div>
+    </div>
     <div class="form-check mb-3">
         <input asp-for="CountsTowardNextMonth" class="form-check-input" />
         <label asp-for="CountsTowardNextMonth" class="form-check-label"></label>
@@ -69,6 +74,7 @@
             document.getElementById('anchor-group').style.display = needsAnchor ? '' : 'none';
             document.getElementById('AnchorDate').required = needsAnchor;
             document.getElementById('day-group').style.display = v === '4' ? '' : 'none';
+            document.getElementById('business-day-group').style.display = v === '3' || v === '4' ? '' : 'none';
         }
         freq.addEventListener('change', toggle);
         toggle();

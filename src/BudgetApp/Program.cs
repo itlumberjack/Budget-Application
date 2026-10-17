@@ -69,6 +69,7 @@ using (var scope = app.Services.CreateScope())
     // Archive months that have ended and build the next six months' budgets.
     var monthBuilder = scope.ServiceProvider.GetRequiredService<BudgetBuilder>();
     await monthBuilder.RemoveDuplicateBillsAsync();
+    await monthBuilder.RedateMonthEndPaychecksAsync();
     await monthBuilder.KeepMonthsCurrentAsync();
 }
 

@@ -27,7 +27,7 @@ public static class PaySchedule
             return nextMonth;
 
         if (rules?.EndOfMonthPayGoesToNextMonth == true && source.Frequency == PayFrequency.Monthly
-            && payday.Day == DateTime.DaysInMonth(payday.Year, payday.Month))
+            && IsMonthEndPayday(source, payday))
             return nextMonth;
 
         if (rules?.WeeklyClosestToFirstStartsMonth == true && source.Frequency == PayFrequency.Weekly)
@@ -46,6 +46,24 @@ public static class PaySchedule
         return ownMonth;
     }
 
+    /// <summary>
+    /// When the last day of the month is paid: that day, or the Friday before when it's a weekend and the
+    /// income source pays on the last business day.
+    /// </summary>
+    public static DateTime MonthEndPayday(IncomeSource source, int year, int month)
+    {
+        var last = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+        return source.MonthEndOnBusinessDay ? last.WeekdayOrFridayBefore() : last;
+    }
+
+    /// <summary>A monthly paycheck scheduled for the last day of its month (even if it came early for a weekend).</summary>
+    public static bool IsMonthEndPayday(IncomeSource source, DateTime payday)
+    {
+        var days = DateTime.DaysInMonth(payday.Year, payday.Month);
+        var paysLastDay = source.DayOfMonth is not int d || d >= days;
+        return paysLastDay && (payday.Day == days || payday.Date == MonthEndPayday(source, payday.Year, payday.Month));
+    }
+
     /// <summary>Every payday for this income source that falls inside the given month.</summary>
     public static IReadOnlyList<DateTime> PaydaysInMonth(IncomeSource source, int year, int month)
     {
@@ -56,11 +74,12 @@ public static class PaySchedule
         switch (source.Frequency)
         {
             case PayFrequency.Monthly:
-                var day = source.DayOfMonth is int d && d < daysInMonth ? d : daysInMonth;
-                return [new DateTime(year, month, day)];
+                return source.DayOfMonth is int d && d < daysInMonth
+                    ? [new DateTime(year, month, d)]
+                    : [MonthEndPayday(source, year, month)];
 
             case PayFrequency.SemiMonthly:
-                return [new DateTime(year, month, 15), last];
+                return [new DateTime(year, month, 15), MonthEndPayday(source, year, month)];
 
             case PayFrequency.Weekly:
                 return Dates.RepeatingInMonth(source.AnchorDate ?? first, 7, year, month);
