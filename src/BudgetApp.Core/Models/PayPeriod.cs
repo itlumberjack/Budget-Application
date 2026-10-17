@@ -30,6 +30,9 @@ public class PayPeriod
     /// </summary>
     public bool ManuallyMoved { get; set; }
 
+    /// <summary>The take-home was changed by hand on the month page, so a new amount on Pay &amp; Schedule leaves it alone.</summary>
+    public bool AmountSetByHand { get; set; }
+
     /// <summary>This paycheck's income and spending when the month's plan was saved. Null before then.</summary>
     [Column(TypeName = "decimal(12,2)")]
     public decimal? PlannedIncome { get; set; }
