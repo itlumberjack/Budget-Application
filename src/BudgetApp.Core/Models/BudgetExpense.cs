@@ -55,6 +55,12 @@ public class BudgetExpense
     /// </summary>
     public bool ExtraPinned { get; set; }
 
+    /// <summary>
+    /// An extra payment on a loan added by hand on the month page, on top of the extra from Debt Payoff: it's kept
+    /// when the extra is spread again and doesn't make the other paydays give less.
+    /// </summary>
+    public bool ExtraAddedByHand { get; set; }
+
     /// <summary>A removed share of the extra payment, kept only so respreading leaves its payday out.</summary>
     [NotMapped]
     public bool IsRemovedExtra => ExtraForDebtId is not null && ExtraPinned && Amount == 0;

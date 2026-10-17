@@ -320,7 +320,7 @@ public class BudgetBuilder(BudgetDbContext db)
             .FirstAsync(b => b.Id == budgetId);
         if (budget.IsArchived) return;
         // Shares that are paid, pending or set by hand stay as they are and count toward their payday.
-        var kept = budget.Expenses.Where(e => e.ExtraForDebtId != null && (e.Status != PaymentStatus.NotPaid || e.ExtraPinned)).ToList();
+        var kept = budget.Expenses.Where(e => e.ExtraForDebtId != null && (e.Status != PaymentStatus.NotPaid || e.ExtraPinned || e.ExtraAddedByHand)).ToList();
         db.BudgetExpenses.RemoveRange(budget.Expenses.Where(e => e.ExtraForDebtId != null && !kept.Contains(e)).ToList());
         foreach (var pay in budget.PayPeriods)
         {
@@ -440,8 +440,9 @@ public class BudgetBuilder(BudgetDbContext db)
         await db.SaveChangesAsync();
     }
 
+    // Extra payments added by hand come on top of the plan's, so they don't count toward a payday's share.
     private static decimal KeptOn(List<BudgetExpense> kept, PayColumn column) =>
-        kept.Where(e => column.Paychecks.Any(p => p.Id == e.PayPeriodId)).Sum(e => e.Amount);
+        kept.Where(e => !e.ExtraAddedByHand && column.Paychecks.Any(p => p.Id == e.PayPeriodId)).Sum(e => e.Amount);
 
     /// <summary>
     /// The paycheck the monthly extra comes out of in a month: the chosen income's Nth paycheck that month (the

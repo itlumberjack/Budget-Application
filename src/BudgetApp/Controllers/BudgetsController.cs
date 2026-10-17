@@ -30,6 +30,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
     public async Task<IActionResult> Month(int year, int month)
     {
         if (month is < 1 or > 12 || year is < 2000 or > 2100) return NotFound();
+        ViewBag.Debts = await db.RecurringDebts.Where(d => d.IsActive).OrderByDescending(d => d.Kind == BillKind.Loan).ThenBy(d => d.Title).ToListAsync();
         return View(await months.LoadAsync(year, month));
     }
 
@@ -291,7 +292,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> AddExpense(int budgetId, int categoryId, int? payPeriodId, string title, string? company, decimal amount, int? dueDay,
-        PaymentStatus status = PaymentStatus.NotPaid, bool isFixed = false)
+        PaymentStatus status = PaymentStatus.NotPaid, bool isFixed = false, int? snowballDebtId = null)
     {
         var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).FirstOrDefaultAsync(b => b.Id == budgetId);
         if (budget is null) return NotFound();
@@ -302,6 +303,22 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
             return RedirectToMonth(budget);
         }
         if (status != PaymentStatus.NotPaid) await months.SavePlanAsync(budget.Id, onlyIfMissing: true);
+        // A snowball payment picked from the loan list: an extra payment on that loan, on top of Debt Payoff's extra.
+        var loan = snowballDebtId is int loanId ? await db.RecurringDebts.Loans().FirstOrDefaultAsync(d => d.Id == loanId) : null;
+        if (loan is not null)
+        {
+            db.BudgetExpenses.Add(new BudgetExpense
+            {
+                MonthlyBudgetId = budgetId, CategoryId = categoryId,
+                PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null,
+                Title = $"Extra: {loan.Title}", Company = loan.Company, Amount = amount,
+                Status = Enum.IsDefined(status) ? status : PaymentStatus.NotPaid,
+                IsFixed = true, ExtraForDebtId = loan.Id, ExtraAddedByHand = true
+            });
+            await db.SaveChangesAsync();
+            TempData["Message"] = $"Added a {amount:C} snowball payment on {loan.Title}. It's on top of the extra from Debt Payoff.";
+            return RedirectToMonth(budget);
+        }
         db.BudgetExpenses.Add(new BudgetExpense
         {
             MonthlyBudgetId = budgetId,
@@ -332,7 +349,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
         expense.Company = company.TrimToNull();
         // A share of the extra payment changed by hand keeps its amount when the month's extra is spread again.
-        var reshare = expense.ExtraForDebtId is not null && expense.Amount != amount;
+        var reshare = expense.ExtraForDebtId is not null && !expense.ExtraAddedByHand && expense.Amount != amount;
         if (reshare) expense.ExtraPinned = true;
         expense.Amount = amount;
         var oldDue = expense.DueDay;
@@ -446,7 +463,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
         if (expense is null) return NotFound();
         if (Archived(expense.MonthlyBudget!, out var locked)) return locked;
-        if (expense.ExtraForDebtId is not null && expense.Status == PaymentStatus.NotPaid)
+        if (expense.ExtraForDebtId is not null && !expense.ExtraAddedByHand && expense.Status == PaymentStatus.NotPaid)
         {
             // A removed share stays as $0 so respreading leaves this payday out, and the other paydays make it up.
             expense.Amount = 0;
