@@ -160,12 +160,12 @@ paid off, its minimum is added to the snowball.
 
 ### Extra payment by payday
 
-**Extra each month** (plus a one-time extra in its month) is paid out of each month's paydays. Paydays with more
-left over give more, so every payday ends up with about the same left over. When one payday has far more left
-than the others, all of the extra can come from it. Each payday's share shows on the month page as an
-"Extra: <loan>" line with a *snowball* badge, and it goes to the first loan in the strategy's order, moving to
-the next loan once the first is covered. Later months use the plan's projected balances. In this month, paydays
-that have already passed are skipped.
+**Extra each month** comes out of the payday picked under *Paid from*: one person's paycheck (for weekly or
+twice-a-month pay, the 1st, 2nd, 3rd, 4th or last one of the month), or *Spread over the paydays*, where paydays
+with more left over give more so every payday ends up with about the same left over. **One-time extras** (a tax
+refund, a bonus) can be added as many as you like, each with a date; each comes out of the payday on or before
+its date. They show on the month page as "Extra: <loan>" lines with a *snowball* badge. In this month, anything
+that falls on a payday that has already passed moves to the next one still to come.
 
 Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid
 shares again. Shares marked pending or complete are kept and count toward that month's total. You can change a

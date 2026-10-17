@@ -68,16 +68,17 @@ public static class WhatIfCalculator
 
         var extra = scenario.ExtraMonthly ?? settings.ExtraMonthly;
         var strategy = scenario.Strategy ?? settings.Strategy;
-        var oneTime = scenario.OneTimeAmount ?? settings.OneTimeAmount;
-        var oneTimeMonth = scenario.OneTimeAmount is null ? settings.OneTimeMonth : scenario.OneTimeMonth ?? firstMonth;
+        // A lump sum in the question comes on top of the one-time extras already planned.
+        var lumps = settings.LumpSums.ToList();
+        if (scenario.OneTimeAmount is decimal oneTime) lumps.Add(new LumpSum(scenario.OneTimeMonth ?? firstMonth, oneTime));
 
-        var before = DebtPlanner.Plan(debts, settings.Strategy, settings.ExtraMonthly, firstMonth, settings.OneTimeAmount, settings.OneTimeMonth);
-        var plan = DebtPlanner.Plan(after, strategy, extra, firstMonth, oneTime, oneTimeMonth);
+        var before = DebtPlanner.Plan(debts, settings.Strategy, settings.ExtraMonthly, firstMonth, settings.LumpSums);
+        var plan = DebtPlanner.Plan(after, strategy, extra, firstMonth, lumps);
         // When the payments go down, also show what happens if the household keeps paying what it pays now.
         PayoffPlan? samePayment = null;
         var drop = debts.Sum(d => d.MinPayment) - after.Sum(d => d.MinPayment);
         if (drop > 0 && strategy != PayoffStrategy.MinimumOnly && scenario.ExtraMonthly is null)
-            samePayment = DebtPlanner.Plan(after, strategy, extra + drop, firstMonth, oneTime, oneTimeMonth);
+            samePayment = DebtPlanner.Plan(after, strategy, extra + drop, firstMonth, lumps);
         return new WhatIfResult(scenario, debts.ToList(), after, before, plan, samePayment, notes);
     }
 

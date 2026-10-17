@@ -71,27 +71,54 @@
                         }
                     </select>
                 </div>
+                @{
+                    var incomes = (List<IncomeSource>)ViewBag.Incomes;
+                    var lumps = (List<DebtLumpSum>)ViewBag.Lumps;
+                    var picked = Model.Settings.ExtraIncomeSourceId is int ps ? $"{ps}:{Model.Settings.ExtraPaydayNumber}" : "spread";
+                }
                 <div class="mb-3">
                     <label class="form-label" for="extraMonthly">Extra each month</label>
                     <div class="input-group">
                         <span class="input-group-text">$</span>
                         <input class="form-control" id="extraMonthly" name="extraMonthly" type="number" step="0.01" min="0" inputmode="decimal" value="@Model.Settings.ExtraMonthly.ToString("0.##")" />
                     </div>
-                    <div class="form-text">On top of the minimums. It's spread over each month's paydays (more from the paydays with more left over, so they end up about even) and goes to the first loan in the strategy's order.</div>
+                    <label class="form-label small mt-2 mb-1" for="extraPayday">Paid from</label>
+                    <select class="form-select form-select-sm" id="extraPayday" name="extraPayday">
+                        <option value="spread" selected="@(picked == "spread")">Spread over the paydays (evens out what's left)</option>
+                        @foreach (var inc in incomes)
+                        {
+                            if (inc.Frequency == PayFrequency.Monthly)
+                            {
+                                <option value="@inc.Id:0" selected="@(picked == $"{inc.Id}:0")">@BudgetApp.Controllers.DebtController.PaydayName(inc, 0)</option>
+                                continue;
+                            }
+                            var count = inc.Frequency == PayFrequency.Weekly ? 4 : 2;
+                            for (var n = 1; n <= count; n++)
+                            {
+                                <option value="@inc.Id:@n" selected="@(picked == $"{inc.Id}:{n}")">@BudgetApp.Controllers.DebtController.PaydayName(inc, n) of the month</option>
+                            }
+                            <option value="@inc.Id:0" selected="@(picked == $"{inc.Id}:0")">@BudgetApp.Controllers.DebtController.PaydayName(inc, 0) of the month</option>
+                        }
+                    </select>
+                    <div class="form-text">On top of the minimums. It goes to one loan at a time, the first in the strategy's order.</div>
                 </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label" for="oneTimeAmount">One-time extra</label>
-                        <div class="input-group">
-                            <span class="input-group-text">$</span>
-                            <input class="form-control" id="oneTimeAmount" name="oneTimeAmount" type="number" step="0.01" min="0" inputmode="decimal" value="@(Model.Settings.OneTimeAmount > 0 ? Model.Settings.OneTimeAmount.ToString("0.##") : "")" placeholder="0" />
-                        </div>
+                <div class="mb-3" id="lumpSums">
+                    <label class="form-label mb-1">One-time extras</label>
+                    <div class="form-text mt-0 mb-2">Like a tax refund or a bonus. Each comes out of the payday on or before its date.</div>
+                    <div id="lumpRows">
+                        @for (var i = 0; i < lumps.Count + 1; i++)
+                        {
+                            var l = i < lumps.Count ? lumps[i] : null;
+                            <div class="lump-row d-flex gap-1 mb-1" data-index="@i">
+                                <input class="form-control form-control-sm" style="min-width:8.5rem" type="date" name="lumps[@i].Date" value="@l?.Date.ToString("yyyy-MM-dd")" aria-label="Date" />
+                                <div class="input-group input-group-sm"><span class="input-group-text">$</span>
+                                    <input class="form-control" type="number" step="0.01" min="0" inputmode="decimal" name="lumps[@i].Amount" value="@l?.Amount.ToString("0.##")" placeholder="0" aria-label="Amount" /></div>
+                                <input class="form-control form-control-sm" name="lumps[@i].Note" value="@l?.Note" placeholder="What it is" maxlength="100" aria-label="Note" />
+                                <button type="button" class="btn btn-sm btn-link text-danger px-1 lump-remove" title="Remove" onclick="this.closest('.lump-row').querySelectorAll('input').forEach(x => x.value = ''); this.closest('.lump-row').hidden = true"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        }
                     </div>
-                    <div class="col-6">
-                        <label class="form-label" for="oneTimeMonth">In</label>
-                        <input class="form-control" id="oneTimeMonth" name="oneTimeMonth" type="month" value="@Model.Settings.OneTimeMonth?.ToString("yyyy-MM")" />
-                    </div>
-                    <div class="form-text">Like a tax refund or a bonus.</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addLump"><i class="bi bi-plus-lg"></i> Add another</button>
                 </div>
                 <div class="d-grid"><button class="btn btn-primary">Update plan</button></div>
             </form>
@@ -362,3 +389,17 @@
         <button class="btn btn-outline-primary mt-3">Save amounts owed</button>
     </form>
 </div></div>
+
+@section Scripts {
+    <script>
+        // "Add another" one-time extra: a copy of the last row with the next index.
+        document.getElementById('addLump')?.addEventListener('click', () => {
+            const rows = document.getElementById('lumpRows'), last = rows.lastElementChild;
+            const index = +last.dataset.index + 1, row = last.cloneNode(true);
+            row.dataset.index = index; row.hidden = false;
+            row.querySelectorAll('input').forEach(x => { x.value = ''; x.name = x.name.replace(/\[\d+\]/, `[${index}]`); });
+            rows.appendChild(row);
+            row.querySelector('input').focus();
+        });
+    </script>
+}

@@ -191,20 +191,41 @@ namespace BudgetApp.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.DebtLumpSum", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DebtLumpSums");
+                });
+
             modelBuilder.Entity("BudgetApp.Models.DebtPlanSettings", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<int?>("ExtraIncomeSourceId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("ExtraMonthly")
                         .HasColumnType("decimal(12,2)");
 
-                    b.Property<decimal>("OneTimeAmount")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<DateTime?>("OneTimeMonth")
-                        .HasColumnType("datetime(6)");
+                    b.Property<int>("ExtraPaydayNumber")
+                        .HasColumnType("int");
 
                     b.Property<int>("PaymentFrequency")
                         .HasColumnType("int");
@@ -224,7 +245,7 @@ namespace BudgetApp.Migrations
                         {
                             Id = 1,
                             ExtraMonthly = 0m,
-                            OneTimeAmount = 0m,
+                            ExtraPaydayNumber = 0,
                             PaymentFrequency = 0,
                             Strategy = 1
                         });

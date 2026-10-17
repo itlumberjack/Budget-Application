@@ -13,6 +13,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<WhatIfQuestion> WhatIfQuestions => Set<WhatIfQuestion>();
+    public DbSet<DebtLumpSum> DebtLumpSums => Set<DebtLumpSum>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
     public DbSet<DebtPlanSettings> DebtPlanSettings => Set<DebtPlanSettings>();
@@ -27,7 +28,12 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
     public Task<BudgetRules> GetRulesAsync() => SingleRowAsync(BudgetRules);
 
     /// <summary>The Debt Payoff page's plan (a single row).</summary>
-    public Task<DebtPlanSettings> GetDebtPlanAsync() => SingleRowAsync(DebtPlanSettings);
+    public async Task<DebtPlanSettings> GetDebtPlanAsync()
+    {
+        var settings = await SingleRowAsync(DebtPlanSettings);
+        settings.LumpSums = await DebtLumpSums.OrderBy(l => l.Date).Select(l => new LumpSum(l.Date, l.Amount)).ToListAsync();
+        return settings;
+    }
 
     /// <summary>The buffer and the leftover split, from the Settings page (a single row).</summary>
     public Task<HouseholdSettings> GetHouseholdAsync() => SingleRowAsync(HouseholdSettings);

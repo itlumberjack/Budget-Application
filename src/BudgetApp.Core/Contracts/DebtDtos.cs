@@ -4,12 +4,12 @@ namespace BudgetApp.Contracts;
 
 /// <summary>The Debt Payoff page: loans, the chosen plan, and how every strategy compares.</summary>
 public record DebtPlanDto(decimal TotalOwed, decimal TotalMinimum, decimal AverageRate, decimal MonthlyInterestNow,
-    PayoffStrategy Strategy, decimal ExtraMonthly, decimal OneTimeAmount, DateTime? OneTimeMonth,
+    PayoffStrategy Strategy, decimal ExtraMonthly, int? ExtraIncomeSourceId, int ExtraPaydayNumber, List<LumpSum> LumpSums,
     List<LoanDto> Loans, PayoffPlan? Plan, PayoffPlan? MinimumOnly, List<PlanSummaryDto> Comparison)
 {
     public static DebtPlanDto From(DebtPageModel m) => new(
         m.TotalOwed, m.TotalMinimum, m.AverageRate, m.MonthlyInterestNow,
-        m.Settings.Strategy, m.Settings.ExtraMonthly, m.Settings.OneTimeAmount, m.Settings.OneTimeMonth,
+        m.Settings.Strategy, m.Settings.ExtraMonthly, m.Settings.ExtraIncomeSourceId, m.Settings.ExtraPaydayNumber, m.Settings.LumpSums,
         m.Loans.Select(l => new LoanDto(l.Id, l.Title, l.Balance ?? 0, l.InterestRate ?? 0, l.MonthlyAmount, l.Amount, l.Frequency, l.PayoffPriority, l.BalanceAsOf,
             l.PromoRate, l.PromoBalance, l.PromoEndDate, l.PromoDeferredInterest)).ToList(),
         m.Plan, m.MinimumOnly,

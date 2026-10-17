@@ -29,10 +29,11 @@ public static class DebtPlanner
     /// the line (soonest-ending promo first), so the extra clears it in time if it can.
     /// </summary>
     public static PayoffPlan Plan(IReadOnlyList<DebtInput> debts, PayoffStrategy strategy, decimal extraMonthly,
-        DateTime firstMonth, decimal oneTimeAmount = 0, DateTime? oneTimeMonth = null)
+        DateTime firstMonth, IReadOnlyList<LumpSum>? lumpSums = null)
     {
+        lumpSums ??= [];
         var order = Order(debts, strategy);
-        var plan = Simulate(debts, order, strategy, extraMonthly, firstMonth, oneTimeAmount, oneTimeMonth);
+        var plan = Simulate(debts, order, strategy, extraMonthly, firstMonth, lumpSums);
         if (strategy == PayoffStrategy.MinimumOnly) return plan;
         var first = new List<int>();
         var skipped = new HashSet<int>();
@@ -43,7 +44,7 @@ public static class DebtPlanner
             var tryFirst = first.Append(missed.DebtId).ToList();
             var promoted = tryFirst.Select(id => order.First(d => d.Id == id)).OrderBy(d => d.Promo!.EndDate).ToList();
             var tried = Simulate(debts, promoted.Concat(order.Where(d => !tryFirst.Contains(d.Id))).ToList(), strategy,
-                extraMonthly, firstMonth, oneTimeAmount, oneTimeMonth);
+                extraMonthly, firstMonth, lumpSums);
             // Keep the new order only if it clears more promos in time (or as many for less interest).
             if (Cleared(tried) > Cleared(plan) || (Cleared(tried) == Cleared(plan) && tried.TotalInterest < plan.TotalInterest))
                 (plan, first) = (tried, tryFirst);
@@ -54,7 +55,7 @@ public static class DebtPlanner
     }
 
     private static PayoffPlan Simulate(IReadOnlyList<DebtInput> debts, List<DebtInput> ordered, PayoffStrategy strategy,
-        decimal extraMonthly, DateTime firstMonth, decimal oneTimeAmount, DateTime? oneTimeMonth)
+        decimal extraMonthly, DateTime firstMonth, IReadOnlyList<LumpSum> lumpSums)
     {
         var snowballOn = strategy != PayoffStrategy.MinimumOnly;
         var monthlyPayment = debts.Sum(d => d.MinPayment) + (snowballOn ? Math.Max(0, extraMonthly) : 0);
@@ -102,8 +103,8 @@ public static class DebtPlanner
 
             // With the snowball the total paid each month stays the same; without it, only open debts' minimums are paid.
             var pool = snowballOn ? monthlyPayment : open.Sum(d => d.MinPayment);
-            if (snowballOn && oneTimeAmount > 0 && oneTimeMonth is DateTime otm && otm.Year == month.Year && otm.Month == month.Month)
-                pool += oneTimeAmount;
+            if (snowballOn)
+                pool += lumpSums.Where(l => l.Amount > 0 && l.Date.Year == month.Year && l.Date.Month == month.Month).Sum(l => l.Amount);
 
             void Pay(DebtInput d, decimal amount, bool isExtra)
             {
@@ -184,7 +185,7 @@ public static class DebtPlanner
     {
         var index = (year - thisMonth.Year) * 12 + month - thisMonth.Month;
         if (index <= 0) return debts.ToDictionary(d => d.Id, d => d.Balance);
-        var plan = Plan(debts, settings.Strategy, settings.ExtraMonthly, thisMonth, settings.OneTimeAmount, settings.OneTimeMonth);
+        var plan = Plan(debts, settings.Strategy, settings.ExtraMonthly, thisMonth, settings.LumpSums);
         return index <= plan.Schedule.Count
             ? new Dictionary<int, decimal>(plan.Schedule[index - 1].Balances)
             : debts.ToDictionary(d => d.Id, _ => 0m);

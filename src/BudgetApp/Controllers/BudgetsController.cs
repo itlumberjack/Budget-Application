@@ -325,7 +325,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
     {
         await builder.SpreadDebtExtraAsync(budget.Id);
         var settings = await db.GetDebtPlanAsync();
-        var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
+        var oneTime = settings.LumpSumsIn(budget.Year, budget.Month);
         var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
         var target = settings.ExtraMonthly + oneTime;
         TempData["Message"] = Math.Abs(monthTotal - target) < 0.01m
@@ -358,7 +358,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         else if (expense.ExtraForDebtId is not null)
         {
             var settings = await db.GetDebtPlanAsync();
-            var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
+            var oneTime = settings.LumpSumsIn(budget.Year, budget.Month);
             var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
             settings.ExtraMonthly = Math.Max(0, monthTotal - oneTime);
             await db.SaveChangesAsync();
