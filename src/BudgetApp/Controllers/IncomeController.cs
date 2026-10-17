@@ -48,13 +48,15 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder, StubRea
             return View("Edit", source);
 
         var isNew = source.Id == 0;
+        var oldAmount = 0m;
         if (!isNew)
         {
             // The form doesn't carry the last check stub; keep it.
             var stub = await db.IncomeSources.AsNoTracking().Where(s => s.Id == source.Id)
-                .Select(s => new { s.StubPayDate, s.StubEmployer, s.StubGross }).FirstOrDefaultAsync();
+                .Select(s => new { s.StubPayDate, s.StubEmployer, s.StubGross, s.TakeHomeAmount }).FirstOrDefaultAsync();
             if (stub is null) return NotFound();
             (source.StubPayDate, source.StubEmployer, source.StubGross) = (stub.StubPayDate, stub.StubEmployer, stub.StubGross);
+            oldAmount = stub.TakeHomeAmount;
         }
         if (isNew) db.IncomeSources.Add(source);
         else db.IncomeSources.Update(source);
@@ -68,7 +70,12 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder, StubRea
         {
             // A month-end payday follows the weekend setting in months already built, too.
             await builder.RedateMonthEndPaychecksAsync();
-            TempData["Message"] = $"Saved {source.Name}. New months use the new amount; months already built keep theirs so your adjustments aren't lost.";
+            var changed = await builder.UpdateIncomeInFutureMonthsAsync(source, oldAmount);
+            // Paychecks pay for the extra debt payments, so those are placed again too.
+            await builder.SpreadDebtExtraAsync();
+            TempData["Message"] = changed == 0
+                ? $"Saved {source.Name}."
+                : $"Saved {source.Name} and updated its paydays from today on in this month's and later budgets. Paydays you changed by hand keep their amount; past paydays stay as they were.";
         }
         return RedirectToAction(nameof(Index));
     }

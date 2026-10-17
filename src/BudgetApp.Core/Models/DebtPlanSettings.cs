@@ -19,6 +19,12 @@ public class DebtPlanSettings : ISingleRow
     public int? ExtraIncomeSourceId { get; set; }
     public int ExtraPaydayNumber { get; set; }
 
+    /// <summary>
+    /// The monthly extra is money from outside the paychecks (a side job, savings), so it's added to the income
+    /// of the payday it's paid from instead of coming out of that paycheck.
+    /// </summary>
+    public bool ExtraMonthlyIsIncome { get; set; }
+
     /// <summary>One-time extra payments, each on its own date (DebtLumpSum rows, filled in by GetDebtPlanAsync).</summary>
     [NotMapped]
     public List<LumpSum> LumpSums { get; set; } = new();

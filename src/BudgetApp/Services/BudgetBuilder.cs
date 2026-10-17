@@ -114,6 +114,50 @@ public class BudgetBuilder(BudgetDbContext db)
                 debt is { IsActive: true } ? [debt] : []);
     }
 
+    /// <summary>
+    /// After a paycheck's settings change on Pay &amp; Schedule, brings its paydays from today on up to date in this
+    /// month's and later budgets: the new name, the new amount (paydays whose amount was changed by hand keep
+    /// theirs), and the new schedule (paydays that no longer fall on the schedule go, missing ones are added, and
+    /// bills on a removed payday move to the right one). Paydays moved by hand and archived months are left alone.
+    /// Returns how many paydays changed.
+    /// </summary>
+    public Task<int> UpdateIncomeInFutureMonthsAsync(IncomeSource source, decimal oldAmount) => Exclusive(async () =>
+    {
+        var rules = await db.GetRulesAsync();
+        var today = DateTime.Today;
+        var changed = 0;
+        var ids = await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived).Select(b => b.Id).ToListAsync();
+        foreach (var id in ids)
+        {
+            var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).ThenInclude(p => p.Extras).Include(b => b.Expenses)
+                .FirstAsync(b => b.Id == id);
+            var expected = source.IsActive ? PaySchedule.PaydaysForBudget(source, budget.Year, budget.Month, rules).Select(d => d.Date).ToHashSet() : [];
+            foreach (var pay in budget.PayPeriods.Where(p => p.IncomeSourceId == source.Id && p.PayDate.Date >= today && !p.ManuallyMoved).ToList())
+            {
+                if (!expected.Contains(pay.PayDate.Date))
+                {
+                    // Bills on it go back to "pick a payday" and are placed again below.
+                    foreach (var e in budget.Expenses.Where(e => e.PayPeriodId == pay.Id)) e.PayPeriodId = null;
+                    db.PayPeriods.Remove(pay);
+                    budget.PayPeriods.Remove(pay);
+                    changed++;
+                    continue;
+                }
+                if (pay.Label != source.Name) pay.Label = source.Name;
+                if (pay.BaseAmount == oldAmount && pay.BaseAmount != source.TakeHomeAmount)
+                {
+                    pay.BaseAmount = source.TakeHomeAmount;
+                    changed++;
+                }
+            }
+            await db.SaveChangesAsync();
+            var before = budget.PayPeriods.Count;
+            await SyncCoreAsync(id, source.IsActive ? [source] : [], []);
+            changed += budget.PayPeriods.Count - before;
+        }
+        return changed;
+    });
+
     private async Task<(int paychecks, int debts)> SyncCoreAsync(int budgetId, IReadOnlyList<IncomeSource> sources, IReadOnlyList<RecurringDebt> debts)
     {
         var budget = await db.MonthlyBudgets
@@ -320,20 +364,37 @@ public class BudgetBuilder(BudgetDbContext db)
         var wanted = new decimal[columns.Count];
         foreach (var lump in lumps)
             wanted[ColumnOn(lump.Date)] += lump.Amount;
+        var monthly = new decimal[columns.Count];
         if (settings.ExtraMonthly > 0)
         {
             var paycheck = ChosenPaycheck(budget, settings);
             if (paycheck is not null)
-                wanted[columns.FindIndex(c => c.Paychecks.Any(p => p.Id == paycheck.Id))] += settings.ExtraMonthly;
+                monthly[columns.FindIndex(c => c.Paychecks.Any(p => p.Id == paycheck.Id))] += settings.ExtraMonthly;
             else
             {
                 // Spread over the paydays that can take it, by what each would have left with no extra on it.
                 var open = Enumerable.Range(0, columns.Count).Where(i => Open(columns[i])).ToList();
                 if (open.Count == 0) open = [columns.Count - 1];
                 var shares = DebtExtraSplitter.Spread(open.Select(i => columns[i].LeftOver + KeptOn(kept, columns[i]) - wanted[i]).ToList(), settings.ExtraMonthly);
-                for (var k = 0; k < open.Count; k++) wanted[open[k]] += shares[k];
+                for (var k = 0; k < open.Count; k++) monthly[open[k]] += shares[k];
             }
         }
+
+        for (var i = 0; i < columns.Count; i++) wanted[i] += monthly[i];
+        // Monthly extra money from outside the paychecks counts as income on the payday it's paid from (added
+        // below, once there's a loan to pay it to).
+        var monthlyIncome = new List<PayPeriodExtra>();
+        if (settings.ExtraMonthlyIsIncome)
+            for (var i = 0; i < columns.Count; i++)
+            {
+                if (monthly[i] <= 0) continue;
+                var at = i;
+                while (at < columns.Count - 1 && Passed(columns[at])) at++;
+                monthlyIncome.Add(new PayPeriodExtra
+                {
+                    PayPeriodId = columns[at].Paychecks[0].Id, Amount = monthly[i], FromDebtExtra = true, Description = "Extra for debt"
+                });
+            }
 
         // Walk the paydays in order. Kept shares count toward their payday; a payday that can't take new shares
         // passes on what it's short (or what it's over by) to the next one.
@@ -363,6 +424,7 @@ public class BudgetBuilder(BudgetDbContext db)
         targets = targets.Where(t => t.Capacity > 0).ToList();
         if (targets.Count == 0) return;
 
+        db.PayPeriodExtras.AddRange(monthlyIncome);
         var payments = DebtExtraSplitter.Assign(give, targets);
         var byId = loans.ToDictionary(l => l.Id);
         foreach (var p in payments)

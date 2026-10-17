@@ -100,7 +100,11 @@
                             <option value="@inc.Id:0" selected="@(picked == $"{inc.Id}:0")">@BudgetApp.Controllers.DebtController.PaydayName(inc, 0) of the month</option>
                         }
                     </select>
-                    <div class="form-text">On top of the minimums. It goes to one loan at a time, the first in the strategy's order.</div>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="extraMonthlyIsIncome" name="extraMonthlyIsIncome" value="true" checked="@Model.Settings.ExtraMonthlyIsIncome" />
+                        <label class="form-check-label small" for="extraMonthlyIsIncome">It's money on top of our paychecks: add it to that payday's income</label>
+                    </div>
+                    <div class="form-text">On top of the minimums. It goes to one loan at a time, the first in the strategy's order. Off: it comes out of the paycheck. One-time extras always count as income.</div>
                 </div>
                 <div class="mb-3" id="lumpSums">
                     <label class="form-label mb-1">One-time extras</label>

@@ -42,11 +42,13 @@ public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthServ
     /// Saves the plan: strategy, monthly extra and the payday it comes from ("spread", or "sourceId:n" for that
     /// income's nth paycheck of the month, 0 for the last), and the one-time extras, which replace the ones saved.
     /// </summary>
-    public async Task<IActionResult> SavePlan(PayoffStrategy strategy, decimal extraMonthly, string? extraPayday, List<DebtLumpSum>? lumps)
+    public async Task<IActionResult> SavePlan(PayoffStrategy strategy, decimal extraMonthly, string? extraPayday, List<DebtLumpSum>? lumps,
+        bool extraMonthlyIsIncome = false)
     {
         var settings = await db.GetDebtPlanAsync();
         if (Enum.IsDefined(strategy)) settings.Strategy = strategy;
         settings.ExtraMonthly = Math.Max(0, extraMonthly);
+        settings.ExtraMonthlyIsIncome = extraMonthlyIsIncome;
         var pick = (extraPayday ?? "").Split(':');
         if (pick.Length == 2 && int.TryParse(pick[0], out var sourceId) && int.TryParse(pick[1], out var n)
             && await db.IncomeSources.AnyAsync(s => s.Id == sourceId))
