@@ -64,6 +64,15 @@ Pay & Schedule, Bills & Expenses and Debt Payoff: paychecks (amounts, dates, Bra
 and the extra debt payments. Tick *Also reset unpaid bills* to put unpaid bills back to their amount, due day and
 payday from Bills & Expenses as well. Past paydays, pending or complete items and paychecks changed by hand stay.
 
+## Custom paydays
+
+Each paycheck on Pay & Schedule has a *Payday schedule*: the next 12 months of paydays for monthly pay, and the next
+3 months for weekly, every-two-weeks and twice-a-month pay. Each one shows its regular date. When a payday comes on a
+different day, like early before a holiday, set the day it's really paid and choose *Save paydays*. The payday moves
+in the budgets already built (its bills move with it) and stays in the same month's budget its regular date would
+put it in, so Brad's rule still applies. Set it back to the regular date to undo. A payday can move up to a month
+either way. Changing the income's schedule drops custom paydays that are no longer on it.
+
 ## Check stubs
 
 Each paycheck on Pay & Schedule (and its edit page) has *Read a check stub*. Pick a PDF or photo of a recent stub

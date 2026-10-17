@@ -90,6 +90,39 @@ else
                                     </table>
                                 </details>
                             }
+                            @if (s.IsActive)
+                            {
+                                var until = BudgetApp.Controllers.IncomeController.ScheduleUntil(s);
+                                var regulars = BudgetApp.Services.PaySchedule.RegularPaydays(s, today, until);
+                                var custom = regulars.Count(r => BudgetApp.Services.PaySchedule.ActualDate(s, r) != r);
+                                <details class="payday-schedule mt-2" data-source="@s.Id">
+                                    <summary class="item-meta">
+                                        <i class="bi bi-calendar3 me-1"></i>Payday schedule, next @(s.Frequency == PayFrequency.Monthly ? "12 months" : "3 months")
+                                        @if (custom > 0) { <span class="badge bg-brand-soft text-brand ms-1">@custom custom</span> }
+                                    </summary>
+                                    <form asp-action="SavePaydays" asp-route-id="@s.Id" method="post" class="mt-1">
+                                        <p class="item-meta mb-1">Paydays usually come on the regular day. When one comes early (or late), like before a holiday, set the day it's really paid. It stays in the same month's budget. Set it back to the regular day to undo.</p>
+                                        <table class="table table-sm small mb-2 align-middle">
+                                            <thead><tr><th>Regular payday</th><th>Paid on</th></tr></thead>
+                                            <tbody>
+                                            @for (var i = 0; i < regulars.Count; i++)
+                                            {
+                                                var r = regulars[i];
+                                                var actual = BudgetApp.Services.PaySchedule.ActualDate(s, r);
+                                                <tr class="@(actual != r ? "table-warning" : "")">
+                                                    <td>@r.ToString("ddd, MMM d, yyyy")<input type="hidden" name="regular[@i]" value="@r.ToString("yyyy-MM-dd")" /></td>
+                                                    <td class="d-flex gap-1 align-items-center">
+                                                        <input type="date" class="form-control form-control-sm" name="payDate[@i]" value="@actual.ToString("yyyy-MM-dd")" data-regular="@r.ToString("yyyy-MM-dd")" style="max-width:11rem" />
+                                                        @if (actual != r) { <span class="badge text-bg-warning">custom</span> }
+                                                    </td>
+                                                </tr>
+                                            }
+                                            </tbody>
+                                        </table>
+                                        <button class="btn btn-sm btn-primary"><i class="bi bi-check2"></i> Save paydays</button>
+                                    </form>
+                                </details>
+                            }
                             <div class="d-flex flex-wrap gap-2 mt-2">
                                 <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
                                 <partial name="_StubUpload" model="s" />

@@ -81,4 +81,22 @@ public class MonthEndBusinessDayTests
         Assert.Equal([new DateTime(2026, 10, 30)], PaySchedule.PaydaysForBudget(Brad(), 2026, 11, rules));
         Assert.Equal([new DateTime(2026, 9, 30)], PaySchedule.PaydaysForBudget(Brad(), 2026, 10, rules));
     }
+
+    [Fact]
+    public void A_custom_payday_moves_the_paycheck_but_keeps_its_budget_month()
+    {
+        // Dec 31 pay comes early on Dec 23 for the holiday; with rule one it still pays January's bills.
+        var brad = new IncomeSource { Id = 3, Frequency = PayFrequency.Monthly };
+        brad.PaydayOverrides.Add(new PaydayOverride { RegularDate = new DateTime(2026, 12, 31), PayDate = new DateTime(2026, 12, 23) });
+        var rules = new BudgetRules { EndOfMonthPayGoesToNextMonth = true };
+        Assert.Equal(new DateTime(2026, 12, 23), PaySchedule.PaydaysInMonth(brad, 2026, 12).Single());
+        Assert.Equal(new DateTime(2026, 12, 23), PaySchedule.PaydaysForBudget(brad, 2027, 1, rules).Single());
+        Assert.Equal(new DateTime(2026, 11, 30), PaySchedule.PaydaysForBudget(brad, 2026, 12, rules).Single());
+        Assert.Equal(new DateTime(2027, 1, 1), PaySchedule.BudgetMonthFor(brad, new DateTime(2026, 12, 23), rules));
+        // Across a month line: Nov 6 paid Oct 30 still counts for November.
+        var jess = new IncomeSource { Id = 4, Frequency = PayFrequency.Weekly, AnchorDate = new DateTime(2026, 10, 2) };
+        jess.PaydayOverrides.Add(new PaydayOverride { RegularDate = new DateTime(2026, 11, 6), PayDate = new DateTime(2026, 11, 5) });
+        Assert.Contains(new DateTime(2026, 11, 5), PaySchedule.PaydaysForBudget(jess, 2026, 11));
+        Assert.DoesNotContain(new DateTime(2026, 11, 6), PaySchedule.PaydaysInMonth(jess, 2026, 11));
+    }
 }

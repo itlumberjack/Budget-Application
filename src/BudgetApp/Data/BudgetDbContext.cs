@@ -12,6 +12,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
 {
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
+    public DbSet<PaydayOverride> PaydayOverrides => Set<PaydayOverride>();
     public DbSet<WhatIfQuestion> WhatIfQuestions => Set<WhatIfQuestion>();
     public DbSet<DebtLumpSum> DebtLumpSums => Set<DebtLumpSum>();
     public DbSet<Category> Categories => Set<Category>();
@@ -57,6 +58,10 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
 
         // Deleting a template keeps the month's copy.
         b.Entity<BudgetExpense>().HasOne(e => e.RecurringDebt).WithMany().OnDelete(DeleteBehavior.SetNull);
+        b.Entity<IncomeSource>().HasMany(s => s.PaydayOverrides).WithOne().HasForeignKey(o => o.IncomeSourceId).OnDelete(DeleteBehavior.Cascade);
+        // Every payday calculation needs the custom paydays, so they come with the income wherever it's loaded.
+        b.Entity<IncomeSource>().Navigation(s => s.PaydayOverrides).AutoInclude();
+        b.Entity<PaydayOverride>().HasIndex(o => new { o.IncomeSourceId, o.RegularDate }).IsUnique();
         b.Entity<IncomeSource>().HasMany(s => s.StubLines).WithOne().HasForeignKey(l => l.IncomeSourceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<PayPeriod>().HasOne(p => p.IncomeSource).WithMany().OnDelete(DeleteBehavior.SetNull);
         // Removing a paycheck source puts bills tied to it back on "whichever payday comes first".

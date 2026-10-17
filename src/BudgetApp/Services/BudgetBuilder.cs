@@ -311,6 +311,8 @@ public class BudgetBuilder(BudgetDbContext db)
         foreach (var pay in paychecks.Where(p => p.PayDate >= Dates.ThisMonth.AddMonths(-1)))
         {
             var source = sources[pay.IncomeSourceId!.Value];
+            // A custom payday stays where it was set.
+            if (source.PaydayOverrides.Any(o => o.PayDate.Date == pay.PayDate.Date)) continue;
             if (source.Frequency == PayFrequency.Monthly && source.DayOfMonth is int d && d < DateTime.DaysInMonth(pay.PayDate.Year, pay.PayDate.Month))
                 continue;
             var last = new DateTime(pay.PayDate.Year, pay.PayDate.Month, DateTime.DaysInMonth(pay.PayDate.Year, pay.PayDate.Month));

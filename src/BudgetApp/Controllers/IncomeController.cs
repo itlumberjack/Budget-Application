@@ -31,6 +31,52 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder, StubRea
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>How far ahead Pay &amp; Schedule lists paydays: a year of monthly pay, three months of the rest.</summary>
+    public static DateTime ScheduleUntil(IncomeSource source) =>
+        DateTime.Today.AddMonths(source.Frequency == PayFrequency.Monthly ? 12 : 3);
+
+    /// <summary>
+    /// Saves custom paydays from the payday schedule on Pay &amp; Schedule: a date different from the regular one
+    /// moves that payday (in budgets already built, too, with its bills), and the regular date puts it back.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SavePaydays(int id, List<DateTime> regular, List<DateTime?> payDate)
+    {
+        var source = await db.IncomeSources.FirstOrDefaultAsync(s => s.Id == id);
+        if (source is null) return NotFound();
+        var changed = new List<string>();
+        var problems = new List<string>();
+        for (var i = 0; i < regular.Count && i < payDate.Count; i++)
+        {
+            var reg = regular[i].Date;
+            var want = (payDate[i] ?? reg).Date;
+            var existing = source.PaydayOverrides.FirstOrDefault(o => o.RegularDate.Date == reg);
+            var was = existing?.PayDate.Date ?? reg;
+            if (want == was) continue;
+            if (Math.Abs((want - reg).TotalDays) > 31)
+            {
+                problems.Add($"{reg:MMM d} can only move up to a month");
+                continue;
+            }
+            if (want == reg) { db.PaydayOverrides.Remove(existing!); source.PaydayOverrides.Remove(existing!); }
+            else if (existing is not null) existing.PayDate = want;
+            else source.PaydayOverrides.Add(new PaydayOverride { IncomeSourceId = id, RegularDate = reg, PayDate = want });
+            // The payday in budgets already built moves with it, bills and all.
+            foreach (var pay in await db.PayPeriods.Where(p => p.IncomeSourceId == id && p.PayDate.Date == was && !p.MonthlyBudget!.IsArchived).ToListAsync())
+                pay.PayDate = want;
+            changed.Add(want == reg ? $"{reg:MMM d} is back on its regular day" : $"{reg:MMM d} is paid {want:dddd, MMM d}");
+        }
+        await db.SaveChangesAsync();
+        if (changed.Count > 0)
+        {
+            await builder.UpdateIncomeInFutureMonthsAsync(source);
+            await builder.SpreadDebtExtraAsync();
+        }
+        TempData["Message"] = changed.Count == 0 && problems.Count == 0 ? $"No payday changes for {source.Name}."
+            : $"{source.Name}: {string.Join(". ", changed.Concat(problems))}.";
+        return RedirectToAction(nameof(Index));
+    }
+
     public IActionResult Create() => View("Edit", new IncomeSource());
 
     public async Task<IActionResult> Edit(int id)
@@ -59,6 +105,15 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder, StubRea
         if (isNew) db.IncomeSources.Add(source);
         else db.IncomeSources.Update(source);
         await db.SaveChangesAsync();
+        if (!isNew)
+        {
+            // Custom paydays stay, unless the schedule changed and their regular payday isn't on it any more.
+            var overrides = await db.PaydayOverrides.Where(o => o.IncomeSourceId == source.Id).ToListAsync();
+            var gone = overrides.Where(o => !PaySchedule.RegularPaydaysInMonth(source, o.RegularDate.Year, o.RegularDate.Month).Contains(o.RegularDate.Date)).ToList();
+            db.PaydayOverrides.RemoveRange(gone);
+            await db.SaveChangesAsync();
+            source.PaydayOverrides = overrides.Except(gone).ToList();
+        }
         if (isNew)
         {
             await builder.AddToCurrentAndFutureMonthsAsync(source: source);

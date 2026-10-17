@@ -60,5 +60,8 @@ public class IncomeSource
     /// <summary>That stub's earnings, taxes and deductions.</summary>
     public List<PayStubLine> StubLines { get; set; } = new();
 
+    /// <summary>Paydays moved off their regular date, set on Pay &amp; Schedule (always loaded with the income).</summary>
+    public List<PaydayOverride> PaydayOverrides { get; set; } = new();
+
     public decimal StubTotal(StubLineKind kind) => StubLines.Where(l => l.Kind == kind).Sum(l => l.Amount);
 }

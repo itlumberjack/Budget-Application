@@ -479,6 +479,29 @@ namespace BudgetApp.Migrations
                     b.ToTable("PayStubLine");
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.PaydayOverride", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("IncomeSourceId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("PayDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("RegularDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeSourceId", "RegularDate")
+                        .IsUnique();
+
+                    b.ToTable("PaydayOverrides");
+                });
+
             modelBuilder.Entity("BudgetApp.Models.RecurringDebt", b =>
                 {
                     b.Property<int>("Id")
@@ -869,6 +892,15 @@ namespace BudgetApp.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.PaydayOverride", b =>
+                {
+                    b.HasOne("BudgetApp.Models.IncomeSource", null)
+                        .WithMany("PaydayOverrides")
+                        .HasForeignKey("IncomeSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BudgetApp.Models.RecurringDebt", b =>
                 {
                     b.HasOne("BudgetApp.Models.Category", "Category")
@@ -940,6 +972,8 @@ namespace BudgetApp.Migrations
 
             modelBuilder.Entity("BudgetApp.Models.IncomeSource", b =>
                 {
+                    b.Navigation("PaydayOverrides");
+
                     b.Navigation("StubLines");
                 });
 
