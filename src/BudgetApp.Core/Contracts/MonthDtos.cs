@@ -11,7 +11,7 @@ public record MonthListItemDto(int Year, int Month, string Title, decimal Income
 /// <summary>A whole month: its paydays (columns on the month page) and the bills each one pays.</summary>
 public record MonthDto(int Id, int Year, int Month, string Title, bool IsArchived, string? Notes,
     decimal Income, decimal Expenses, decimal Remaining, decimal Complete, decimal Pending, decimal NotPaid,
-    SplitDto Split, List<PaydayDto> Paydays)
+    SplitDto Split, List<PaydayDto> Paydays, PlanDto? Plan)
 {
     public static MonthDto From(MonthViewModel month)
     {
@@ -28,26 +28,41 @@ public record MonthDto(int Id, int Year, int Month, string Title, bool IsArchive
                 c.Income, c.Spending, c.LeftOver,
                 c.IsUnassigned ? null : SplitDto.From(household.Split(c.LeftOver), household),
                 c.Expenses.OrderBy(e => e.DueDay ?? 32).ThenBy(e => e.Title)
-                    .Select(e => BillDto.From(e, paysLate: !month.PaysOnTime(c, e))).ToList()))
-                .ToList());
+                    .Select(e => BillDto.From(e, paysLate: !month.PaysOnTime(c, e))).ToList(),
+                new NowDto(c.Paid, c.Pending, c.StillToPay, c.LeftNow),
+                budget.HasPlan && !c.IsUnassigned ? new PlanDto(null, c.PlannedIncome, c.PlannedSpending, c.PlannedLeftOver) : null))
+                .ToList(),
+            budget.HasPlan ? new PlanDto(budget.PlanSavedAt, month.PlannedIncome, month.PlannedExpenses, month.PlannedRemaining) : null);
     }
 }
 
 /// <summary>One payday column. The "Not assigned" column has no paychecks and no split.</summary>
 public record PaydayDto(string Heading, bool IsUnassigned, List<PaycheckDto> Paychecks,
-    decimal Income, decimal Spending, decimal LeftOver, SplitDto? Split, List<BillDto> Bills);
+    decimal Income, decimal Spending, decimal LeftOver, SplitDto? Split, List<BillDto> Bills, NowDto Now, PlanDto? Plan);
+
+/// <summary>
+/// The original plan, saved when the first bill was marked pending or complete (or by hand). SavedAt is only set
+/// on the month's plan.
+/// </summary>
+public record PlanDto(DateTime? SavedAt, decimal Income, decimal Spending, decimal LeftOver);
+
+/// <summary>Where a payday stands: paid, on its way, not paid yet, and what's left once paid and pending bills are out.</summary>
+public record NowDto(decimal Paid, decimal Pending, decimal StillToPay, decimal LeftNow);
 
 public record PaycheckDto(int Id, string Label, DateTime PayDate, decimal BaseAmount, decimal Total, List<PayExtraDto> Extras);
 
 public record PayExtraDto(int Id, string Description, decimal Amount);
 
-/// <summary>A bill in a month. PaysLate is set when its payday comes after the due day.</summary>
+/// <summary>
+/// A bill in a month. PaysLate is set when its payday comes after the due day. PlannedAmount is its amount in the
+/// month's plan (null when there's no plan or it was added after).
+/// </summary>
 public record BillDto(int Id, string Title, string? Company, decimal Amount, int? DueDay, int CategoryId, string? Category,
-    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate)
+    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate, decimal? PlannedAmount)
 {
     public static BillDto From(BudgetExpense e, bool paysLate) =>
         new(e.Id, e.Title, e.Company, e.Amount, e.DueDay, e.CategoryId, e.Category?.Name, e.Status, e.IsFixed,
-            e.RecurringDebtId is not null, e.PayPeriodId, paysLate);
+            e.RecurringDebtId is not null, e.PayPeriodId, paysLate, e.PlannedAmount);
 }
 
 /// <summary>Left over, the buffer held back, and each person's share.</summary>

@@ -37,4 +37,8 @@ public class BudgetExpense
 
     /// <summary>Stays on its payday: Even out and the AI helper leave it where it is.</summary>
     public bool IsFixed { get; set; }
+
+    /// <summary>The amount when the month's plan was saved. Null for bills added after that (or before any plan).</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal? PlannedAmount { get; set; }
 }

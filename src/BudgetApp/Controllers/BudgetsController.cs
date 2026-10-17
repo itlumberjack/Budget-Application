@@ -122,6 +122,21 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>Saves the month as it stands now as the plan each payday is compared against.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SavePlan(int id)
+    {
+        var budget = await db.MonthlyBudgets.FindAsync(id);
+        if (budget is null) return NotFound();
+        if (Archived(budget, out var locked)) return locked;
+        var replacing = budget.HasPlan;
+        await months.SavePlanAsync(id);
+        TempData["Message"] = replacing
+            ? "Saved this month as it stands now as the plan."
+            : "Saved the plan. Each payday now shows the plan next to where things stand.";
+        return RedirectToMonth(budget);
+    }
+
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveNotes(int id, string? notes)
     {
@@ -251,6 +266,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
             TempData["Error"] = "Give the expense a name.";
             return RedirectToMonth(budget);
         }
+        if (status != PaymentStatus.NotPaid) await months.SavePlanAsync(budget.Id, onlyIfMissing: true);
         db.BudgetExpenses.Add(new BudgetExpense
         {
             MonthlyBudgetId = budgetId,
@@ -276,6 +292,8 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (expense is null) return NotFound();
         var budget = expense.MonthlyBudget!;
         if (Archived(budget, out var locked)) return locked;
+        // The plan is saved before this change, so it shows how things looked before anything was paid.
+        if (status != PaymentStatus.NotPaid) await months.SavePlanAsync(budget.Id, onlyIfMissing: true);
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
         expense.Company = company.TrimToNull();
         expense.Amount = amount;
@@ -295,6 +313,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (expense is null) return NotFound();
         if (Archived(expense.MonthlyBudget!, out var locked)) return locked;
         if (!Enum.IsDefined(status)) return BadRequest();
+        if (status != PaymentStatus.NotPaid) await months.SavePlanAsync(expense.MonthlyBudgetId, onlyIfMissing: true);
         expense.Status = status;
         await db.SaveChangesAsync();
         return RedirectToMonth(expense.MonthlyBudget!);

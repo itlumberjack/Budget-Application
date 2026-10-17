@@ -48,6 +48,8 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
         // Deleting a template keeps the month's copy.
         b.Entity<BudgetExpense>().HasOne(e => e.RecurringDebt).WithMany().OnDelete(DeleteBehavior.SetNull);
         b.Entity<PayPeriod>().HasOne(p => p.IncomeSource).WithMany().OnDelete(DeleteBehavior.SetNull);
+        // Removing a paycheck source puts bills tied to it back on "whichever payday comes first".
+        b.Entity<RecurringDebt>().HasOne(d => d.PaidFrom).WithMany().HasForeignKey(d => d.PaidFromIncomeSourceId).OnDelete(DeleteBehavior.SetNull);
 
         // Removing a paycheck moves its bills to "Not assigned" rather than deleting them.
         b.Entity<BudgetExpense>().HasOne(e => e.PayPeriod).WithMany().OnDelete(DeleteBehavior.SetNull);

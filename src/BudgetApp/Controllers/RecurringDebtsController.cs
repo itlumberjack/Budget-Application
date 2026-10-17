@@ -45,6 +45,9 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
         if (debt.Frequency == BillFrequency.Monthly) debt.StartDate = null;
         else debt.DueDay = null;
         if (!Enum.IsDefined(debt.Kind)) debt.Kind = BillKind.Bill;
+        // Whose payday only applies to mandatory items, and only to a paycheck that exists.
+        if (!debt.IsFixed || !await db.IncomeSources.AnyAsync(s => s.Id == debt.PaidFromIncomeSourceId))
+            debt.PaidFromIncomeSourceId = null;
         debt.ClearLoanDetailsUnlessLoan();
         if (!ModelState.IsValid)
         {
@@ -52,7 +55,7 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             return View("Edit", debt);
         }
         var isNew = debt.Id == 0;
-        var old = isNew ? null : await db.RecurringDebts.AsNoTracking().Where(d => d.Id == debt.Id).Select(d => new { d.Balance, d.Kind }).FirstOrDefaultAsync();
+        var old = isNew ? null : await db.RecurringDebts.AsNoTracking().Where(d => d.Id == debt.Id).Select(d => new { d.Balance, d.Kind, d.PaidFromIncomeSourceId }).FirstOrDefaultAsync();
         if (debt.Balance != old?.Balance) debt.BalanceAsOf = debt.Balance is null ? null : DateTime.Today;
 
         // A monthly loan that's new (or just became a loan) joins the Debt Payoff page's weekly or every-two-weeks
@@ -79,6 +82,9 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             await db.BudgetExpenses.Where(e => e.RecurringDebtId == debt.Id && months.Contains(e.MonthlyBudgetId))
                 .ExecuteUpdateAsync(u => u.SetProperty(e => e.IsFixed, debt.IsFixed));
             if (joinsSchedule) await builder.RescheduleAsync([debt.Id]);
+            // A new choice of whose payday moves its unpaid copies in this month and later ones.
+            if (old is not null && old.PaidFromIncomeSourceId != debt.PaidFromIncomeSourceId)
+                await builder.PlaceCopiesAsync(debt.Id);
             TempData["Message"] = $"Saved {debt.Title}. New months use the change; months already built keep their own amounts." + scheduleNote;
         }
         return RedirectToAction(nameof(Index));
@@ -96,7 +102,9 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task LoadCategoriesAsync() =>
-        ViewBag.Categories = new SelectList(
-            await db.Categories.InDisplayOrder().ToListAsync(), "Id", "Name");
+    private async Task LoadCategoriesAsync()
+    {
+        ViewBag.Categories = new SelectList(await db.Categories.InDisplayOrder().ToListAsync(), "Id", "Name");
+        ViewBag.IncomeSources = await db.IncomeSources.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync();
+    }
 }

@@ -66,14 +66,25 @@ public static class BudgetApi
             return Results.Ok(new ApplyMovesResult(moved));
         });
 
+        // Saves the month as it stands as the plan each payday is compared against (also done on the first payment).
+        api.MapPost("/months/{id:int}/plan", async (int id, BudgetDbContext db, MonthService months) =>
+        {
+            var budget = await db.MonthlyBudgets.FindAsync(id);
+            if (budget is null) return Results.NotFound();
+            if (budget.IsArchived) return Archived(budget);
+            await months.SavePlanAsync(id);
+            return Results.Ok(MonthDto.From((await months.LoadAsync(id))!));
+        });
+
         // ----- Bills in a month -----
 
-        api.MapPut("/bills/{id:int}/status", async (int id, StatusUpdate update, BudgetDbContext db) =>
+        api.MapPut("/bills/{id:int}/status", async (int id, StatusUpdate update, BudgetDbContext db, MonthService months) =>
         {
             if (!Enum.IsDefined(update.Status)) return Results.BadRequest(new ApiError("Unknown status."));
             var bill = await db.BudgetExpenses.Include(e => e.MonthlyBudget).FirstOrDefaultAsync(e => e.Id == id);
             if (bill is null) return Results.NotFound();
             if (bill.MonthlyBudget!.IsArchived) return Archived(bill.MonthlyBudget);
+            if (update.Status != PaymentStatus.NotPaid) await months.SavePlanAsync(bill.MonthlyBudgetId, onlyIfMissing: true);
             bill.Status = update.Status;
             await db.SaveChangesAsync();
             return Results.NoContent();

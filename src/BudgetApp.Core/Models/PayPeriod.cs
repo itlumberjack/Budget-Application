@@ -30,6 +30,13 @@ public class PayPeriod
     /// </summary>
     public bool ManuallyMoved { get; set; }
 
+    /// <summary>This paycheck's income and spending when the month's plan was saved. Null before then.</summary>
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal? PlannedIncome { get; set; }
+
+    [Column(TypeName = "decimal(12,2)")]
+    public decimal? PlannedSpending { get; set; }
+
     [NotMapped]
     public decimal Total => BaseAmount + Extras.Sum(e => e.Amount);
 }

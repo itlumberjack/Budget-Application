@@ -276,3 +276,17 @@ tr.moving { opacity: .5; pointer-events: none; }
 .sheet-block.drop-no, .sheet-heading.drop-no { opacity: .35; transition: opacity .15s; }
 .sheet-block.drop-ok, .sheet-heading.drop-ok { transition: background-color .15s; }
 .sheet-block.drop-over, .sheet-heading.drop-over { background: color-mix(in srgb, var(--brand) 18%, transparent); }
+
+/* Plan vs now on each payday */
+.plan-bar { padding: .1rem .2rem; }
+.sheet-summary .plan-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6c757d); padding: 6px 10px 2px; border: 0; font-weight: 600; }
+.sheet-summary .plan-table .plan-change td { font-size: .8rem; border-top: 0; padding-top: 0; }
+.now-block { margin-top: .5rem; }
+.now-block .progress { height: .4rem; }
+.now-block .sheet-table { background: transparent; }
+.now-block .sheet-table td { padding: 3px 10px; }
+.now-block .swatch { width: .7rem; height: .7rem; border-radius: .2rem; border: 1px solid var(--line-strong); display: inline-block; background: var(--surface); vertical-align: -1px; margin-right: .2rem; }
+.now-block .swatch.status-complete { background: var(--complete-bg); border-color: var(--complete-bg); }
+.now-block .swatch.status-pending { background: var(--pending-bg); border-color: var(--pending-solid); }
+.plan-was { font-size: .72rem; color: var(--muted, #6c757d); font-weight: 400; line-height: 1.1; }
+.sheet-summary .plan-table tfoot td { font-size: .95rem; white-space: nowrap; }

@@ -51,6 +51,14 @@ public class RecurringDebt
     [Display(Name = "Mandatory: stays on its payday")]
     public bool IsFixed { get; set; }
 
+    /// <summary>
+    /// For a mandatory item: whose paychecks it comes out of, e.g. food always from Jessica's weekly check.
+    /// Empty means whichever payday comes before it's due.
+    /// </summary>
+    [Display(Name = "Whose payday")]
+    public int? PaidFromIncomeSourceId { get; set; }
+    public IncomeSource? PaidFrom { get; set; }
+
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 

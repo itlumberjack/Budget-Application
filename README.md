@@ -72,6 +72,11 @@ switched in its edit dialog. On the month page fixed bills show a pin, and a war
 bill whose payday comes after its due date (for example a bill due the 1st when the first paycheck is the 2nd;
 Brad's rule can fix that by moving the end-of-month paycheck forward).
 
+A mandatory item can also say **whose payday** it stays on. Pick a person (say, food from Jessica's weekly
+check) and every unpaid copy goes under that person's last paycheck before it's due, in this month and
+later ones. Leave it on "Anyone's" to use whichever paycheck comes before the due date. Turning Mandatory
+off clears the choice.
+
 Even out and the AI helper never move a bill to a payday after its due date. A monthly bill is added to a
 month once; only bills you add on the month page can repeat.
 
@@ -89,6 +94,16 @@ short (left over below zero) has nothing to split.
 same amount left over. A bill only moves to a payday on or before its due day (or to the first payday),
 so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
 **Apply selected**.
+
+## Plan vs now
+
+Each month keeps its original plan. The plan is saved the first time a bill in that month is marked pending or
+complete, or straight away with **Save the plan now** above the paydays. After that, the bottom of every payday
+shows the plan and where it stands now side by side (income, spending and left over) plus what's paid, pending and
+not paid yet, and what's left in the account once paid and pending bills are out. These update as soon as a status
+dot is clicked. A bill whose amount changed shows its planned amount under it, and one added later says "not in
+plan". **Make this the plan** replaces the saved plan with the month as it stands. The phone API returns the same
+numbers (Plan and Now on each payday, PlannedAmount on each bill) and `POST /api/months/{id}/plan` saves the plan.
 
 ## Moving bills and marking them paid
 
