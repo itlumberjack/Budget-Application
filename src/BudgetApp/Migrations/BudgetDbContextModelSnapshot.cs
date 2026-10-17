@@ -224,6 +224,9 @@ namespace BudgetApp.Migrations
                     b.Property<decimal>("ExtraMonthly")
                         .HasColumnType("decimal(12,2)");
 
+                    b.Property<bool>("ExtraMonthlyIsIncome")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("ExtraPaydayNumber")
                         .HasColumnType("int");
 
@@ -245,6 +248,7 @@ namespace BudgetApp.Migrations
                         {
                             Id = 1,
                             ExtraMonthly = 0m,
+                            ExtraMonthlyIsIncome = false,
                             ExtraPaydayNumber = 0,
                             PaymentFrequency = 0,
                             Strategy = 1

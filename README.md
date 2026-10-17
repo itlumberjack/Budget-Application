@@ -52,6 +52,13 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
+## Changing a paycheck
+
+Saving a paycheck on Pay & Schedule updates its paydays from today on in this month's and later budgets: the new
+name and take-home pay (a payday whose amount you changed by hand on a month page keeps it), and a new schedule
+(paydays that no longer fall on it are removed, missing ones added, and bills on a removed payday move to the
+right one). Paydays before today, paydays moved by hand and archived months stay as they were.
+
 ## Check stubs
 
 Each paycheck on Pay & Schedule (and its edit page) has *Read a check stub*. Pick a PDF or photo of a recent stub
@@ -165,7 +172,9 @@ twice-a-month pay, the 1st, 2nd, 3rd, 4th or last one of the month), or *Spread 
 with more left over give more so every payday ends up with about the same left over. **One-time extras** (a tax
 refund, a bonus) can be added as many as you like, each with a date; each comes out of the payday on or before
 its date, and it's added to that payday's income (with a *snowball* badge; change it on Debt Payoff) so it doesn't
-come out of the paycheck. They show on the month page as "Extra: <loan>" lines with a *snowball* badge. In this month, anything
+come out of the paycheck. If the monthly extra is also money on top of your paychecks, turn on *It's money on top of
+our paychecks* and it's added to its payday's income too. The month's Income card says how much of the income is
+extra for debt. They show on the month page as "Extra: <loan>" lines with a *snowball* badge. In this month, anything
 that falls on a payday that has already passed moves to the next one still to come.
 
 Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid

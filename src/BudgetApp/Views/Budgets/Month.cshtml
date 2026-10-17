@@ -64,7 +64,8 @@
         <div class="card stat">
             <div class="label"><span class="stat-icon icon-income"><i class="bi bi-cash-stack"></i></span> Income</div>
             <div class="value money mt-1">@Model.TotalIncome.ToString("C")</div>
-            <div class="hint">@b.PayPeriods.Count paychecks</div>
+            @{ var snowballIncome = b.PayPeriods.SelectMany(p => p.Extras).Where(x => x.FromDebtExtra).Sum(x => x.Amount); }
+            <div class="hint">@b.PayPeriods.Count paychecks<span id="snowballIncome" hidden="@(snowballIncome == 0)"> · includes @snowballIncome.ToString("C") extra for debt</span></div>
         </div>
     </div>
     <div class="col-6 col-lg-3">
