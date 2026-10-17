@@ -268,3 +268,11 @@ details > summary { cursor: pointer; }
 .archived .edit-only, .archived .block-add, .archived .shift-form,
 .archived [data-bs-target="#aiModal"], .archived .ps-3 form { display: none !important; }
 .archived tr.clickable, .archived .status-dot { pointer-events: none; cursor: default; }
+
+/* Dragging a bill to another payday on the month page */
+tr[draggable=true] { cursor: grab; }
+tr.dragging { opacity: .4; }
+tr.moving { opacity: .5; pointer-events: none; }
+.sheet-block.drop-no, .sheet-heading.drop-no { opacity: .35; transition: opacity .15s; }
+.sheet-block.drop-ok, .sheet-heading.drop-ok { transition: background-color .15s; }
+.sheet-block.drop-over, .sheet-heading.drop-over { background: color-mix(in srgb, var(--brand) 18%, transparent); }

@@ -300,6 +300,32 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         return RedirectToMonth(expense.MonthlyBudget!);
     }
 
+    /// <summary>
+    /// Moves a bill to another payday by dragging it on the month page. Mandatory bills stay put, and a bill
+    /// can't be dragged to a payday after it's due (the same rule Even out follows).
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveExpense(int id, int payPeriodId)
+    {
+        var budgetId = await db.BudgetExpenses.Where(e => e.Id == id).Select(e => (int?)e.MonthlyBudgetId).FirstOrDefaultAsync();
+        var month = budgetId is int bid ? await months.LoadAsync(bid) : null;
+        var expense = month?.Budget!.Expenses.FirstOrDefault(e => e.Id == id);
+        if (month is null || expense is null) return NotFound();
+        if (Archived(month.Budget!, out var locked)) return locked;
+        var to = month.Columns.FirstOrDefault(c => c.Paychecks.Any(p => p.Id == payPeriodId));
+        if (to is null || to.Paychecks.Any(p => p.Id == expense.PayPeriodId)) return RedirectToMonth(month.Budget!);
+        if (expense.IsFixed)
+            TempData["Error"] = $"{expense.Title} is mandatory, so it stays on its payday. Turn that off in its edit dialog to move it.";
+        else if (!month.CanMoveTo(to, expense))
+            TempData["Error"] = $"{to.Heading} is after {expense.Title} is due, so it can't go there.";
+        else
+        {
+            expense.PayPeriodId = to.TargetPayPeriodId;
+            await db.SaveChangesAsync();
+        }
+        return RedirectToMonth(month.Budget!);
+    }
+
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteExpense(int id)
     {

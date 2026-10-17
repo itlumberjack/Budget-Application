@@ -90,6 +90,14 @@ same amount left over. A bill only moves to a payday on or before its due day (o
 so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
 **Apply selected**.
 
+## Moving bills and marking them paid
+
+- **Drag a bill** to another payday's column to move it. While dragging, paydays after the bill's due date
+  are dimmed and won't take it, and mandatory bills (with a pin) don't drag at all; open one and turn
+  Mandatory off to move it. Dragging works with a mouse; on a phone, tap the bill and pick its payday instead.
+- **The status dot** cycles Not paid, Pending, Complete. It changes on the spot and saves in the background,
+  and the totals update without reloading the page.
+
 ## Shifting the first or last payday
 
 On a month page, the first payday column has a left arrow and the last one has a right arrow. The left
