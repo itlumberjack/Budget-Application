@@ -37,6 +37,13 @@ public class IncomeSource
     [Display(Name = "Budget this paycheck in the following month")]
     public bool CountsTowardNextMonth { get; set; }
 
+    /// <summary>
+    /// Pay on the last day of the month comes on the last business day instead: when the 31st is a Sunday,
+    /// payday is Friday the 29th. Applies to monthly pay on the last day and the second twice-a-month check.
+    /// </summary>
+    [Display(Name = "When the last day is a weekend, payday is the Friday before")]
+    public bool MonthEndOnBusinessDay { get; set; } = true;
+
     [Display(Name = "Active")]
     public bool IsActive { get; set; } = true;
 }

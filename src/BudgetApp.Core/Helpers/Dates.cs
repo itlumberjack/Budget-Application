@@ -9,6 +9,14 @@ public static class Dates
     /// <summary>The first day of the current month.</summary>
     public static DateTime ThisMonth => DateTime.Today.MonthStart();
 
+    /// <summary>The Friday before when the date is a Saturday or Sunday; otherwise the date itself.</summary>
+    public static DateTime WeekdayOrFridayBefore(this DateTime date) => date.DayOfWeek switch
+    {
+        DayOfWeek.Saturday => date.Date.AddDays(-1),
+        DayOfWeek.Sunday => date.Date.AddDays(-2),
+        _ => date.Date
+    };
+
     /// <summary>"October 2026".</summary>
     public static string MonthTitle(this DateTime date) => date.ToString("MMMM yyyy");
 

@@ -58,6 +58,8 @@ public class IncomeController(BudgetDbContext db, BudgetBuilder builder) : Contr
         }
         else
         {
+            // A month-end payday follows the weekend setting in months already built, too.
+            await builder.RedateMonthEndPaychecksAsync();
             TempData["Message"] = $"Saved {source.Name}. New months use the new amount; months already built keep theirs so your adjustments aren't lost.";
         }
         return RedirectToAction(nameof(Index));

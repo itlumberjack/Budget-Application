@@ -184,6 +184,41 @@ public class BudgetBuilder(BudgetDbContext db)
     }
 
     /// <summary>
+    /// Keeps month-end paychecks in this month's and later budgets on the right day: moved back to the Friday
+    /// when the last day is a weekend and the income source pays on the last business day, or out to the last
+    /// day when it doesn't. Archived months and paychecks with a date changed by hand are left alone.
+    /// Returns how many paychecks moved.
+    /// </summary>
+    public Task<int> RedateMonthEndPaychecksAsync() => Exclusive(async () =>
+    {
+        var sources = await db.IncomeSources
+            .Where(s => s.Frequency == PayFrequency.Monthly || s.Frequency == PayFrequency.SemiMonthly)
+            .ToDictionaryAsync(s => s.Id);
+        if (sources.Count == 0) return 0;
+        var ids = sources.Keys.ToList();
+        var paychecks = await db.PayPeriods
+            .Where(p => p.IncomeSourceId != null && ids.Contains(p.IncomeSourceId.Value)
+                        && !p.MonthlyBudget!.IsArchived)
+            .ToListAsync();
+        var moved = 0;
+        foreach (var pay in paychecks.Where(p => p.PayDate >= Dates.ThisMonth.AddMonths(-1)))
+        {
+            var source = sources[pay.IncomeSourceId!.Value];
+            if (source.Frequency == PayFrequency.Monthly && source.DayOfMonth is int d && d < DateTime.DaysInMonth(pay.PayDate.Year, pay.PayDate.Month))
+                continue;
+            var last = new DateTime(pay.PayDate.Year, pay.PayDate.Month, DateTime.DaysInMonth(pay.PayDate.Year, pay.PayDate.Month));
+            var businessDay = last.WeekdayOrFridayBefore();
+            if (last == businessDay || (pay.PayDate.Date != last && pay.PayDate.Date != businessDay)) continue;
+            var due = PaySchedule.MonthEndPayday(source, pay.PayDate.Year, pay.PayDate.Month);
+            if (pay.PayDate.Date == due) continue;
+            pay.PayDate = due;
+            moved++;
+        }
+        await db.SaveChangesAsync();
+        return moved;
+    });
+
+    /// <summary>
     /// After bills change schedule (loans switched to weekly payments, say), redoes their copies in this month's
     /// and later months' budgets. A month where one of those bills is already pending or complete keeps its copies
     /// of that bill as they are, so nothing paid is lost or paid twice. Archived months are left alone.
