@@ -291,3 +291,4 @@ tr.moving { opacity: .5; pointer-events: none; }
 .plan-was { font-size: .72rem; color: var(--muted, #6c757d); font-weight: 400; line-height: 1.1; }
 .sheet-summary .plan-table tfoot td { font-size: .95rem; white-space: nowrap; }
 .badge-snowball { background: var(--brand-soft); color: var(--brand-ink); border: 1px solid var(--brand-ring); font-weight: 500; }
+.owed-after { font-size: .72rem; color: var(--brand-ink); font-weight: 500; line-height: 1.1; }

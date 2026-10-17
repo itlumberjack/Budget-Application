@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BudgetApp.Controllers;
 
 /// <summary>Debt statistics and payoff plans for bills that have an amount owed (loans, cards).</summary>
-public class DebtController(BudgetDbContext db, BudgetBuilder builder) : Controller
+public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthService months) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -16,7 +16,15 @@ public class DebtController(BudgetDbContext db, BudgetBuilder builder) : Control
         var loans = await db.RecurringDebts.Loans().ToListAsync();
         var settings = await db.GetDebtPlanAsync();
         // This month's extra payment, payday by payday, as it was spread on the month page.
-        var month = await db.MonthlyBudgets.FirstOrDefaultAsync(b => b.Year == DateTime.Today.Year && b.Month == DateTime.Today.Month);
+        var month = await db.MonthlyBudgets.Include(b => b.PayPeriods).Include(b => b.Expenses)
+            .FirstOrDefaultAsync(b => b.Year == DateTime.Today.Year && b.Month == DateTime.Today.Month);
+        // What's left on each loan after each of this month's payments, and after the month's last one.
+        Dictionary<int, decimal> owedAfter = month is null ? new() : await months.OwedAfterAsync(month);
+        ViewBag.OwedAfter = owedAfter;
+        ViewBag.OwedAfterMonth = month is null ? new Dictionary<int, decimal>() : month.Expenses
+            .Where(e => owedAfter.ContainsKey(e.Id))
+            .GroupBy(e => e.ExtraForDebtId ?? e.RecurringDebtId!.Value)
+            .ToDictionary(g => g.Key, g => g.Min(e => owedAfter[e.Id]));
         ViewBag.ThisMonth = month;
         ViewBag.ExtraThisMonth = month is null ? new List<BudgetExpense>()
             : await db.BudgetExpenses.Include(e => e.PayPeriod).Include(e => e.ExtraForDebt)

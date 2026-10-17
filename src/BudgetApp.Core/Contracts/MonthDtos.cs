@@ -28,7 +28,7 @@ public record MonthDto(int Id, int Year, int Month, string Title, bool IsArchive
                 c.Income, c.Spending, c.LeftOver,
                 c.IsUnassigned ? null : SplitDto.From(household.Split(c.LeftOver), household),
                 c.Expenses.OrderBy(e => e.DueDay ?? 32).ThenBy(e => e.Title)
-                    .Select(e => BillDto.From(e, paysLate: !month.PaysOnTime(c, e))).ToList(),
+                    .Select(e => BillDto.From(e, paysLate: !month.PaysOnTime(c, e), month.OwedAfter.TryGetValue(e.Id, out var owed) ? owed : null)).ToList(),
                 new NowDto(c.Paid, c.Pending, c.StillToPay, c.LeftNow),
                 budget.HasPlan && !c.IsUnassigned ? new PlanDto(null, c.PlannedIncome, c.PlannedSpending, c.PlannedLeftOver) : null))
                 .ToList(),
@@ -56,14 +56,15 @@ public record PayExtraDto(int Id, string Description, decimal Amount);
 /// <summary>
 /// A bill in a month. PaysLate is set when its payday comes after the due day. PlannedAmount is its amount in the
 /// month's plan (null when there's no plan or it was added after). ExtraForDebtId marks a payday's share of
-/// the Debt Payoff page's extra payment and names the loan it goes to.
+/// the Debt Payoff page's extra payment and names the loan it goes to. OwedAfter is what's left on a loan after
+/// this payment (loan payments and extra shares only).
 /// </summary>
 public record BillDto(int Id, string Title, string? Company, decimal Amount, int? DueDay, int CategoryId, string? Category,
-    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate, decimal? PlannedAmount, int? ExtraForDebtId)
+    PaymentStatus Status, bool IsFixed, bool IsRecurring, int? PayPeriodId, bool PaysLate, decimal? PlannedAmount, int? ExtraForDebtId, decimal? OwedAfter)
 {
-    public static BillDto From(BudgetExpense e, bool paysLate) =>
+    public static BillDto From(BudgetExpense e, bool paysLate, decimal? owedAfter = null) =>
         new(e.Id, e.Title, e.Company, e.Amount, e.DueDay, e.CategoryId, e.Category?.Name, e.Status, e.IsFixed,
-            e.RecurringDebtId is not null, e.PayPeriodId, paysLate, e.PlannedAmount, e.ExtraForDebtId);
+            e.RecurringDebtId is not null, e.PayPeriodId, paysLate, e.PlannedAmount, e.ExtraForDebtId, owedAfter);
 }
 
 /// <summary>Left over, the buffer held back, and each person's share.</summary>

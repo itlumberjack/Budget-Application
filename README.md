@@ -162,6 +162,11 @@ Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on
 shares again. Shares marked pending or complete are kept and count toward that month's total. You can change a
 share's amount on the month page. The Debt Payoff page lists this month's shares under *Extra by payday*.
 
+Next to each loan payment and extra share on a month page is what's left on that loan after it ("$250 left",
+or "paid off"), counting that month's payments in payday order. This month starts from the amount owed on
+Debt Payoff; later months start from the plan's projected balance. Debt Payoff shows the same numbers in
+*Extra by payday* and an *End of* column in the payoff order. Past months don't show it.
+
 Loans used to have a weekly or every-two-weeks option. Any loan still on one of those schedules goes back to
 one monthly payment when the site starts.
 

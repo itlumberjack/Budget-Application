@@ -94,4 +94,46 @@ public static class DebtPlanner
         return new PayoffPlan(strategy, monthlyPayment, outcomes, schedule,
             interestPaid.Values.Sum(), schedule.Sum(s => s.Payments.Values.Sum()), paysOff);
     }
+
+    /// <summary>
+    /// Each loan's balance at the start of a month: today's balance for this month, and for later months what
+    /// the payoff plan projects (interest and payments included). Months the plan never reaches count as paid off.
+    /// </summary>
+    public static Dictionary<int, decimal> StartBalances(IReadOnlyList<DebtInput> debts, DebtPlanSettings settings,
+        DateTime thisMonth, int year, int month)
+    {
+        var index = (year - thisMonth.Year) * 12 + month - thisMonth.Month;
+        if (index <= 0) return debts.ToDictionary(d => d.Id, d => d.Balance);
+        var plan = Plan(debts, settings.Strategy, settings.ExtraMonthly, thisMonth, settings.OneTimeAmount, settings.OneTimeMonth);
+        return index <= plan.Schedule.Count
+            ? new Dictionary<int, decimal>(plan.Schedule[index - 1].Balances)
+            : debts.ToDictionary(d => d.Id, _ => 0m);
+    }
+
+    /// <summary>
+    /// What's left on the loan after each of a month's loan payments (its regular payment and any extra), in
+    /// payday order, starting from the loan's balance at the start of the month. Keyed by the month line's id.
+    /// </summary>
+    public static Dictionary<int, decimal> OwedAfterEachPayment(MonthlyBudget budget, IReadOnlyDictionary<int, decimal> startBalances)
+    {
+        var payDates = budget.PayPeriods.ToDictionary(p => p.Id, p => p.PayDate);
+        var owedAfter = new Dictionary<int, decimal>();
+        var byLoan = budget.Expenses
+            .Select(e => (Expense: e, LoanId: e.ExtraForDebtId ?? e.RecurringDebtId))
+            .Where(x => x.LoanId is int id && startBalances.ContainsKey(id))
+            .GroupBy(x => x.LoanId!.Value);
+        foreach (var loan in byLoan)
+        {
+            var owed = startBalances[loan.Key];
+            foreach (var (e, _) in loan
+                         .OrderBy(x => x.Expense.PayPeriodId is int p && payDates.TryGetValue(p, out var date) ? date : DateTime.MaxValue)
+                         .ThenBy(x => x.Expense.ExtraForDebtId is null ? 0 : 1)
+                         .ThenBy(x => x.Expense.DueDay ?? 32).ThenBy(x => x.Expense.Id))
+            {
+                owed = Math.Max(0, owed - e.Amount);
+                owedAfter[e.Id] = owed;
+            }
+        }
+        return owedAfter;
+    }
 }
