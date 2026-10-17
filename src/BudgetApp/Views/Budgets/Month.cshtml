@@ -225,10 +225,17 @@
                             <tr>
                                 <td class="ps-3">
                                     + @x.Description
-                                    <form asp-action="DeletePayExtra" method="post" class="d-inline">
-                                        <input type="hidden" name="id" value="@x.Id" />
-                                        <button class="btn btn-link btn-sm text-danger p-0 ms-1" title="Remove">&times;</button>
-                                    </form>
+                                    @if (x.FromDebtExtra)
+                                    {
+                                        <a asp-controller="Debt" asp-action="Index" class="badge badge-snowball text-decoration-none" title="A one-time extra from Debt Payoff. Change or remove it there.">snowball</a>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="DeletePayExtra" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@x.Id" />
+                                            <button class="btn btn-link btn-sm text-danger p-0 ms-1" title="Remove">&times;</button>
+                                        </form>
+                                    }
                                 </td>
                                 <td class="text-end money">@x.Amount.ToString("C")</td>
                             </tr>

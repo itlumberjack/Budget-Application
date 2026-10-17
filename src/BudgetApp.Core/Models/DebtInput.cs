@@ -11,7 +11,7 @@ public record DebtInput(int Id, string Name, decimal Balance, decimal Apr, decim
 public record PromoTerms(decimal Rate, decimal? Balance, DateTime EndDate, bool DeferredInterest);
 
 /// <summary>A one-time extra payment toward debt (a "snowflake", such as a tax refund) on a date.</summary>
-public record LumpSum(DateTime Date, decimal Amount);
+public record LumpSum(DateTime Date, decimal Amount, string? Note = null);
 
 /// <summary>Whether a plan clears a promo balance before the promo ends, and what it would take if not.</summary>
 public record PromoCheck(int DebtId, string Name, decimal PromoBalance, decimal Rate, DateTime EndDate, bool DeferredInterest,

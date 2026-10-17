@@ -31,7 +31,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
     public async Task<DebtPlanSettings> GetDebtPlanAsync()
     {
         var settings = await SingleRowAsync(DebtPlanSettings);
-        settings.LumpSums = await DebtLumpSums.OrderBy(l => l.Date).Select(l => new LumpSum(l.Date, l.Amount)).ToListAsync();
+        settings.LumpSums = await DebtLumpSums.OrderBy(l => l.Date).Select(l => new LumpSum(l.Date, l.Amount, l.Note)).ToListAsync();
         return settings;
     }
 

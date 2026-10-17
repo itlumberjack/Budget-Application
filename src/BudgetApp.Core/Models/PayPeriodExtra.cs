@@ -15,4 +15,7 @@ public class PayPeriodExtra
 
     [Column(TypeName = "decimal(12,2)")]
     public decimal Amount { get; set; }
+
+    /// <summary>A one-time extra from Debt Payoff (a bonus, a tax refund) counted as income on the payday it's paid from.</summary>
+    public bool FromDebtExtra { get; set; }
 }

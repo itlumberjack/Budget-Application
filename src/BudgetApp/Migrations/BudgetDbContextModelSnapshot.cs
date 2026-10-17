@@ -423,6 +423,9 @@ namespace BudgetApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<bool>("FromDebtExtra")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("PayPeriodId")
                         .HasColumnType("int");
 

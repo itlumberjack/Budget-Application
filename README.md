@@ -164,7 +164,8 @@ paid off, its minimum is added to the snowball.
 twice-a-month pay, the 1st, 2nd, 3rd, 4th or last one of the month), or *Spread over the paydays*, where paydays
 with more left over give more so every payday ends up with about the same left over. **One-time extras** (a tax
 refund, a bonus) can be added as many as you like, each with a date; each comes out of the payday on or before
-its date. They show on the month page as "Extra: <loan>" lines with a *snowball* badge. In this month, anything
+its date, and it's added to that payday's income (with a *snowball* badge; change it on Debt Payoff) so it doesn't
+come out of the paycheck. They show on the month page as "Extra: <loan>" lines with a *snowball* badge. In this month, anything
 that falls on a payday that has already passed moves to the next one still to come.
 
 Saving the plan, saving amounts owed, changing a loan, or *Add missing items* on a month spreads the unpaid

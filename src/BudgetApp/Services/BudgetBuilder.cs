@@ -278,6 +278,11 @@ public class BudgetBuilder(BudgetDbContext db)
         // Shares that are paid, pending or set by hand stay as they are and count toward their payday.
         var kept = budget.Expenses.Where(e => e.ExtraForDebtId != null && (e.Status != PaymentStatus.NotPaid || e.ExtraPinned)).ToList();
         db.BudgetExpenses.RemoveRange(budget.Expenses.Where(e => e.ExtraForDebtId != null && !kept.Contains(e)).ToList());
+        foreach (var pay in budget.PayPeriods)
+        {
+            db.PayPeriodExtras.RemoveRange(pay.Extras.Where(x => x.FromDebtExtra));
+            pay.Extras.RemoveAll(x => x.FromDebtExtra);
+        }
         await db.SaveChangesAsync();
 
         var settings = await db.GetDebtPlanAsync();
@@ -285,17 +290,35 @@ public class BudgetBuilder(BudgetDbContext db)
         var first = Dates.ThisMonth;
         if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly || budget.FirstDay < first) return;
 
-        var view = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget };
-        var columns = view.Columns.Where(c => !c.IsUnassigned).ToList();
+        var columns = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget }.Columns.Where(c => !c.IsUnassigned).ToList();
         if (columns.Count == 0) return;
-        // A payday can take new shares once it's still to come (in this month) and nothing on it was set by hand.
-        bool Open(PayColumn c) => (budget.FirstDay != first || c.Paychecks.Max(p => p.PayDate.Date) >= DateTime.Today)
-                                  && !kept.Any(e => e.ExtraPinned && c.Paychecks.Any(p => p.Id == e.PayPeriodId));
+        var lumps = settings.LumpSums.Where(l => l.Date.Year == budget.Year && l.Date.Month == budget.Month && l.Amount > 0).ToList();
+        bool Passed(PayColumn c) => budget.FirstDay == first && c.Paychecks.Max(p => p.PayDate.Date) < DateTime.Today;
         int ColumnOn(DateTime date) => Math.Max(0, columns.FindLastIndex(c => c.Paychecks.Min(p => p.PayDate.Date) <= date.Date));
+
+        // A one-time extra is money coming in: it's added to the income of the payday it's paid from (or, once that
+        // payday has passed, the next one still to come).
+        if (lumps.Count > 0)
+        {
+            foreach (var lump in lumps)
+            {
+                var i = ColumnOn(lump.Date);
+                while (i < columns.Count - 1 && Passed(columns[i])) i++;
+                columns[i].Paychecks[0].Extras.Add(new PayPeriodExtra
+                {
+                    PayPeriodId = columns[i].Paychecks[0].Id, Amount = lump.Amount, FromDebtExtra = true,
+                    Description = string.IsNullOrWhiteSpace(lump.Note) ? "One-time extra for debt" : lump.Note
+                });
+            }
+            await db.SaveChangesAsync();
+            columns = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget }.Columns.Where(c => !c.IsUnassigned).ToList();
+        }
+        // A payday can take new shares once it's still to come (in this month) and nothing on it was set by hand.
+        bool Open(PayColumn c) => !Passed(c) && !kept.Any(e => e.ExtraPinned && c.Paychecks.Any(p => p.Id == e.PayPeriodId));
 
         // What each payday is meant to give.
         var wanted = new decimal[columns.Count];
-        foreach (var lump in settings.LumpSums.Where(l => l.Date.Year == budget.Year && l.Date.Month == budget.Month && l.Amount > 0))
+        foreach (var lump in lumps)
             wanted[ColumnOn(lump.Date)] += lump.Amount;
         if (settings.ExtraMonthly > 0)
         {
@@ -307,7 +330,7 @@ public class BudgetBuilder(BudgetDbContext db)
                 // Spread over the paydays that can take it, by what each would have left with no extra on it.
                 var open = Enumerable.Range(0, columns.Count).Where(i => Open(columns[i])).ToList();
                 if (open.Count == 0) open = [columns.Count - 1];
-                var shares = DebtExtraSplitter.Spread(open.Select(i => columns[i].LeftOver + KeptOn(kept, columns[i])).ToList(), settings.ExtraMonthly);
+                var shares = DebtExtraSplitter.Spread(open.Select(i => columns[i].LeftOver + KeptOn(kept, columns[i]) - wanted[i]).ToList(), settings.ExtraMonthly);
                 for (var k = 0; k < open.Count; k++) wanted[open[k]] += shares[k];
             }
         }
