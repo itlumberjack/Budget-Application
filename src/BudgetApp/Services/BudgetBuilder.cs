@@ -288,11 +288,7 @@ public class BudgetBuilder(BudgetDbContext db)
 
         // Each loan's balance at the start of this month, as the payoff plan projects it from today's balances.
         var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
-        var monthIndex = (budget.Year - first.Year) * 12 + budget.Month - first.Month;
-        var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.ExtraMonthly, first, settings.OneTimeAmount, settings.OneTimeMonth);
-        var startBalances = monthIndex == 0 ? inputs.ToDictionary(d => d.Id, d => d.Balance)
-            : monthIndex <= plan.Schedule.Count ? plan.Schedule[monthIndex - 1].Balances
-            : inputs.ToDictionary(d => d.Id, _ => 0m);
+        var startBalances = DebtPlanner.StartBalances(inputs, settings, first, budget.Year, budget.Month);
         // What a loan can still take this month: its balance less the minimum payment and any extra already paid.
         var paidExtra = budget.Expenses.Where(e => e.ExtraForDebtId != null && e.Status != PaymentStatus.NotPaid)
             .GroupBy(e => e.ExtraForDebtId!.Value).ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));

@@ -281,6 +281,10 @@
                                 <td>@e.Company</td>
                                 <td class="text-end money">
                                     @e.Amount.ToString("C")
+                                    @if (Model.OwedAfter.TryGetValue(e.Id, out var owed))
+                                    {
+                                        <div class="owed-after" title="Left to pay on this debt after this payment">@(owed == 0 ? "paid off" : owed.ToString("C0") + " left")</div>
+                                    }
                                     @if (Model.HasPlan && e.PlannedAmount is decimal planned && planned != e.Amount)
                                     {
                                         <div class="plan-was" title="Amount in the plan">plan @planned.ToString("C")</div>

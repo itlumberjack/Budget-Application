@@ -110,10 +110,11 @@
                             <td class="text-nowrap">@(e.PayPeriod is { } p ? p.PayDate.ToString("MMM d") : "Not assigned")</td>
                             <td>@(e.ExtraForDebt?.Title ?? e.Title.Replace("Extra: ", ""))</td>
                             <td class="text-end money">@e.Amount.ToString("C")</td>
+                            <td class="text-end money text-muted small">@(((Dictionary<int, decimal>)ViewBag.OwedAfter).TryGetValue(e.Id, out var left) ? left.ToString("C0") + " left" : "")</td>
                         </tr>
                     }
                     </tbody>
-                    <tfoot><tr class="fw-semibold"><td colspan="2">Total</td><td class="text-end money">@extras.Sum(e => e.Amount).ToString("C")</td></tr></tfoot>
+                    <tfoot><tr class="fw-semibold"><td colspan="2">Total</td><td class="text-end money">@extras.Sum(e => e.Amount).ToString("C")</td><td></td></tr></tfoot>
                 </table>
                 <div class="form-text">Change a payday's amount on the <a href="@Url.RouteUrl("month", new { year = thisMonth.Year, month = thisMonth.Month })">month page</a>. Saving here spreads the unpaid ones again.</div>
             }
@@ -207,7 +208,7 @@
         <div class="card-header">Payoff order</div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
-                <thead><tr><th>#</th><th>Debt</th><th class="text-end">Owed</th><th class="text-end">Rate</th><th class="text-end">Minimum</th><th class="text-end">Paid off</th><th class="text-end">Interest</th></tr></thead>
+                <thead><tr><th>#</th><th>Debt</th><th class="text-end">Owed</th><th class="text-end" title="After this month's payments, including the extra">End of @DateTime.Today.ToString("MMM")</th><th class="text-end">Rate</th><th class="text-end">Minimum</th><th class="text-end">Paid off</th><th class="text-end">Interest</th></tr></thead>
                 <tbody>
                 @foreach (var o in plan.Debts)
                 {
@@ -215,6 +216,7 @@
                         <td>@o.Order</td>
                         <td class="fw-semibold">@o.Debt.Name</td>
                         <td class="text-end money">@o.Debt.Balance.ToString("C")</td>
+                        <td class="text-end money owed-month">@(((Dictionary<int, decimal>)ViewBag.OwedAfterMonth).TryGetValue(o.Debt.Id, out var endOfMonth) ? endOfMonth.ToString("C") : "")</td>
                         <td class="text-end">@o.Debt.Apr.ToString("0.###")%</td>
                         <td class="text-end money">@o.Debt.MinPayment.ToString("C")</td>
                         <td class="text-end">@(o.PayoffDate?.ToString("MMM yyyy") ?? "Never")</td>

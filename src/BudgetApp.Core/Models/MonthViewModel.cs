@@ -10,6 +10,9 @@ public class MonthViewModel
     public List<Category> Categories { get; init; } = new();
     public HouseholdSettings Household { get; init; } = new();
 
+    /// <summary>What's left on a loan after each of this month's loan payments, by month line id.</summary>
+    public Dictionary<int, decimal> OwedAfter { get; init; } = new();
+
     public DateTime FirstDay => new(Year, Month, 1);
     public string Title => FirstDay.MonthTitle();
     public DateTime Previous => FirstDay.AddMonths(-1);

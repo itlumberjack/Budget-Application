@@ -41,3 +41,28 @@ public class DebtExtraTests
             payments);
     }
 }
+
+public class OwedAfterTests
+{
+    [Fact]
+    public void Each_payment_lowers_what_is_left_in_payday_order()
+    {
+        var month = new BudgetApp.Models.MonthlyBudget
+        {
+            Year = 2026, Month = 11,
+            PayPeriods = [new() { Id = 1, PayDate = new DateTime(2026, 11, 6) }, new() { Id = 2, PayDate = new DateTime(2026, 11, 20) }],
+            Expenses =
+            [
+                new() { Id = 10, Title = "Extra: Card", Amount = 300, PayPeriodId = 2, ExtraForDebtId = 7 },
+                new() { Id = 11, Title = "Card", Amount = 50, PayPeriodId = 1, RecurringDebtId = 7 },
+                new() { Id = 12, Title = "Power", Amount = 210, PayPeriodId = 1, RecurringDebtId = 8 },
+                new() { Id = 13, Title = "Extra: Card", Amount = 600, PayPeriodId = 2, ExtraForDebtId = 7 }
+            ]
+        };
+        var owed = DebtPlanner.OwedAfterEachPayment(month, new Dictionary<int, decimal> { [7] = 800 });
+        Assert.Equal(750, owed[11]);
+        Assert.Equal(450, owed[10]);
+        Assert.Equal(0, owed[13]); // never below zero
+        Assert.False(owed.ContainsKey(12)); // not a loan
+    }
+}

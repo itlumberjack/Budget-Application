@@ -1,4 +1,5 @@
 using BudgetApp.Data;
+using BudgetApp.Helpers;
 using BudgetApp.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,8 +55,21 @@ public class MonthService(BudgetDbContext db, BudgetBuilder builder)
             Month = month,
             Budget = budget,
             Categories = await db.Categories.InDisplayOrder().ToListAsync(),
-            Household = await db.GetHouseholdAsync()
+            Household = await db.GetHouseholdAsync(),
+            OwedAfter = budget is null ? new() : await OwedAfterAsync(budget)
         };
+    }
+
+    /// <summary>What's left on each loan after each of the month's payments to it (see DebtPlanner.OwedAfterEachPayment).</summary>
+    public async Task<Dictionary<int, decimal>> OwedAfterAsync(MonthlyBudget budget)
+    {
+        // Past months: today's balances already include their payments.
+        if (budget.FirstDay < Dates.ThisMonth || !budget.Expenses.Any(e => e.ExtraForDebtId != null || e.RecurringDebtId != null)) return new();
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        if (loans.Count == 0) return new();
+        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
+        var start = DebtPlanner.StartBalances(inputs, await db.GetDebtPlanAsync(), Dates.ThisMonth, budget.Year, budget.Month);
+        return DebtPlanner.OwedAfterEachPayment(budget, start);
     }
 
     /// <summary>
