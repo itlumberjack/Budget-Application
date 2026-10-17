@@ -286,7 +286,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateExpense(int id, string title, string? company, decimal amount, int? dueDay,
-        int categoryId, int? payPeriodId, PaymentStatus status, bool isFixed)
+        int categoryId, int? payPeriodId, PaymentStatus status, bool isFixed, bool applyForward = false)
     {
         var expense = await db.BudgetExpenses.Include(e => e.MonthlyBudget).ThenInclude(b => b!.PayPeriods)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -298,13 +298,53 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         if (!string.IsNullOrWhiteSpace(title)) expense.Title = title.Trim();
         expense.Company = company.TrimToNull();
         expense.Amount = amount;
+        var oldDue = expense.DueDay;
+        var oldPay = expense.PayPeriodId;
         expense.DueDay = dueDay.ValidDay();
         if (await db.Categories.AnyAsync(c => c.Id == categoryId)) expense.CategoryId = categoryId;
         expense.PayPeriodId = budget.PayPeriods.Any(p => p.Id == payPeriodId) ? payPeriodId : null;
+        // A new due day with the payday left as it was: put it under the payday before it's now due.
+        if (expense.DueDay != oldDue && expense.PayPeriodId == oldPay && !isFixed)
+            expense.PayPeriodId = BudgetBuilder.PickPayPeriod(budget.PayPeriods, budget.Year, budget.Month, expense.DueDay)?.Id ?? oldPay;
         if (Enum.IsDefined(status)) expense.Status = status;
         expense.IsFixed = isFixed;
         await db.SaveChangesAsync();
+        if (applyForward) await CarryForwardAsync(expense, budget);
         return RedirectToMonth(budget);
+    }
+
+    /// <summary>
+    /// "Also change later months" in the edit dialog. A recurring bill's change goes to the bill on Bills &amp;
+    /// Expenses and its unpaid copies in later months. A share of the extra debt payment makes this month's extra
+    /// total the new monthly extra on Debt Payoff, spread again over the later months' paydays.
+    /// </summary>
+    private async Task CarryForwardAsync(BudgetExpense expense, MonthlyBudget budget)
+    {
+        if (expense.RecurringDebtId is int debtId && await db.RecurringDebts.FindAsync(debtId) is { } debt)
+        {
+            var dueDayChanged = debt.Frequency == BillFrequency.Monthly && debt.DueDay != expense.DueDay;
+            debt.Title = expense.Title;
+            debt.Company = expense.Company;
+            debt.Amount = expense.Amount;
+            debt.CategoryId = expense.CategoryId;
+            debt.IsFixed = expense.IsFixed;
+            if (debt.Frequency == BillFrequency.Monthly) debt.DueDay = expense.DueDay;
+            await db.SaveChangesAsync();
+            await builder.CarryForwardAsync(debt.Id, budget.Year, budget.Month, expense.DueDay, dueDayChanged);
+            // A loan's payment is its minimum, which changes how much room the extra payment has.
+            if (debt.Kind == BillKind.Loan) await builder.SpreadDebtExtraAsync(after: (budget.Year, budget.Month));
+            TempData["Message"] = $"Saved {expense.Title} here, on Bills & Expenses, and in the ones after it.";
+        }
+        else if (expense.ExtraForDebtId is not null)
+        {
+            var settings = await db.GetDebtPlanAsync();
+            var oneTime = settings.OneTimeMonth is DateTime otm && otm.Year == budget.Year && otm.Month == budget.Month ? settings.OneTimeAmount : 0;
+            var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
+            settings.ExtraMonthly = Math.Max(0, monthTotal - oneTime);
+            await db.SaveChangesAsync();
+            await builder.SpreadDebtExtraAsync(after: (budget.Year, budget.Month));
+            TempData["Message"] = $"The extra debt payment is now {settings.ExtraMonthly:C} a month, spread over the paydays in later months.";
+        }
     }
 
     [HttpPost, ValidateAntiForgeryToken]

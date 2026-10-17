@@ -21,6 +21,10 @@ public static class QueryExtensions
     }
 
     /// <summary>Months that ended before this one.</summary>
+    /// <summary>Months after the given one (any day in it).</summary>
+    public static IQueryable<MonthlyBudget> After(this IQueryable<MonthlyBudget> months, int year, int month) =>
+        months.Where(b => b.Year > year || (b.Year == year && b.Month > month));
+
     public static IQueryable<MonthlyBudget> BeforeThisMonth(this IQueryable<MonthlyBudget> months)
     {
         var start = Dates.ThisMonth;
