@@ -37,4 +37,20 @@ public class DebtPlannerTests
         Assert.Equal(7928.30m, plan.TotalInterest);
         Assert.Equal(112, plan.Months);
     }
+
+    [Fact]
+    public void A_paid_off_loan_has_a_last_payment_then_none_and_its_payment_rolls_into_the_snowball()
+    {
+        var plan = Plan(PayoffStrategy.Avalanche);
+        var visa = plan.Debts.First(d => d.Debt.Id == 3);
+        var last = visa.PayoffMonth!.Value - 1;
+        // Full minimum before the payoff month, what's left in it, nothing after.
+        Assert.Equal(120, DebtPlanner.RegularPayment(plan, 3, last - 1));
+        Assert.InRange(DebtPlanner.RegularPayment(plan, 3, last), 0.01m, 120);
+        Assert.Equal(0, DebtPlanner.RegularPayment(plan, 3, last + 1));
+        Assert.Equal(0, DebtPlanner.RegularPayment(plan, 3, 9999));
+        // The month after, the snowball is the extra plus the Visa's freed-up minimum.
+        Assert.Equal(300, DebtPlanner.MonthlySnowball(plan, 0, 0));
+        Assert.Equal(420, DebtPlanner.MonthlySnowball(plan, last + 1, 0));
+    }
 }

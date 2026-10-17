@@ -283,6 +283,7 @@
                                     @if (e.DueDay is int due) { <span class="text-muted small">(@Dates.Ordinal(due))</span> }
                                     @if (e.IsFixed) { <i class="bi bi-pin-angle-fill text-muted small" title="Fixed to this payday. Even out and the AI helper leave it here."></i> }
                                     @if (!Model.PaysOnTime(col, e)) { <i class="bi bi-exclamation-triangle-fill text-warning small" title="This payday comes after the bill is due."></i> }
+                                    @if (e.IsFinalPayment) { <span class="badge text-bg-success" title="The payoff plan pays this loan off with this payment, so it's what's left on it. It's off the budget after this.">last payment</span> }
                                     @if (e.ExtraAddedByHand) { <span class="badge badge-snowball" title="A snowball payment added on this month, on top of the extra from Debt Payoff">snowball +</span> }
                                     else if (e.ExtraForDebtId is not null) { <span class="badge badge-snowball" title="This payday's share of the extra debt payment from Debt Payoff">snowball</span> }
                                     else if (e.RecurringDebtId is null) { <span class="badge text-bg-secondary">extra</span> }

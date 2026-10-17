@@ -185,11 +185,27 @@ public static class DebtPlanner
     {
         var index = (year - thisMonth.Year) * 12 + month - thisMonth.Month;
         if (index <= 0) return debts.ToDictionary(d => d.Id, d => d.Balance);
-        var plan = Plan(debts, settings.Strategy, settings.ExtraMonthly, thisMonth, settings.LumpSums);
+        var plan = Plan(debts, settings.Strategy, settings.Snowball, thisMonth, settings.LumpSums);
         return index <= plan.Schedule.Count
             ? new Dictionary<int, decimal>(plan.Schedule[index - 1].Balances)
             : debts.ToDictionary(d => d.Id, _ => 0m);
     }
+
+    /// <summary>
+    /// A loan's regular payment in a month of the plan (0 = its first month): the minimum until the month the loan
+    /// is paid off, what's left on it in that month, and nothing after.
+    /// </summary>
+    public static decimal RegularPayment(PayoffPlan plan, int debtId, int index) =>
+        index >= 0 && index < plan.Schedule.Count
+            ? plan.Schedule[index].Payments.GetValueOrDefault(debtId) - plan.Schedule[index].Extra.GetValueOrDefault(debtId)
+            : 0;
+
+    /// <summary>
+    /// The extra a month of the plan pays beyond its one-time extras: the monthly extra plus the payments freed up
+    /// by loans already paid off (less once there's not that much left to pay).
+    /// </summary>
+    public static decimal MonthlySnowball(PayoffPlan plan, int index, decimal lumpSums) =>
+        index >= 0 && index < plan.Schedule.Count ? Math.Max(0, plan.Schedule[index].Extra.Values.Sum() - lumpSums) : 0;
 
     /// <summary>
     /// What's left on the loan after each of a month's loan payments (its regular payment and any extra), in

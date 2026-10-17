@@ -32,6 +32,9 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
     {
         var settings = await SingleRowAsync(DebtPlanSettings);
         settings.LumpSums = await DebtLumpSums.OrderBy(l => l.Date).Select(l => new LumpSum(l.Date, l.Amount, l.Note)).ToListAsync();
+        var paidOff = await RecurringDebts.PaidOffLoans().ToListAsync();
+        settings.PaidOffLoans = paidOff.Select(l => l.Title).ToList();
+        settings.PaidOffPayments = paidOff.Sum(l => l.MonthlyAmount);
         return settings;
     }
 

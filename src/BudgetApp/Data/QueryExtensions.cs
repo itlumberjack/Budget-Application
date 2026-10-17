@@ -38,4 +38,8 @@ public static class QueryExtensions
     /// <summary>Active loans with an amount owed, for the Debt Payoff page.</summary>
     public static IQueryable<RecurringDebt> Loans(this IQueryable<RecurringDebt> debts) =>
         debts.Where(d => d.IsActive && d.Kind == BillKind.Loan && d.Balance > 0).OrderBy(d => d.Id);
+
+    /// <summary>Active loans that are paid off (a balance of $0). They're left off the budget.</summary>
+    public static IQueryable<RecurringDebt> PaidOffLoans(this IQueryable<RecurringDebt> debts) =>
+        debts.Where(d => d.IsActive && d.Kind == BillKind.Loan && d.Balance != null && d.Balance <= 0).OrderBy(d => d.Id);
 }

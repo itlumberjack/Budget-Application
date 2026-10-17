@@ -198,9 +198,12 @@ public class BudgetBuilder(BudgetDbContext db)
         // Paychecks need ids before bills can point at them.
         await db.SaveChangesAsync();
 
+        // Loans are left off once the payoff plan has them paid off.
+        var loanPayments = debts.Any(d => d.Kind == BillKind.Loan) ? await LoanPaymentsAsync(budget.Year, budget.Month) : null;
         var addedDebts = 0;
         foreach (var debt in debts)
         {
+            if (loanPayments is not null && loanPayments.TryGetValue(debt.Id, out var loanPayment) && loanPayment <= 0) continue;
             // A weekly bill gets one copy per week it's due. Copies already in the month are kept as they are,
             // so only the missing due days are added (and never more copies than the schedule has).
             var dueDays = debt.DueDaysIn(budget.Year, budget.Month);
@@ -225,9 +228,66 @@ public class BudgetBuilder(BudgetDbContext db)
         var paidFrom = await PaidFromAsync();
         foreach (var expense in budget.Expenses.Where(e => e.PayPeriodId is null))
             expense.PayPeriodId = PickPayPeriod(expense, budget.PayPeriods, budget.Year, budget.Month, paidFrom)?.Id;
+        if (loanPayments is not null) await FitLoanPaymentsAsync(budget, loanPayments);
 
         await db.SaveChangesAsync();
         return (addedPay, addedDebts);
+    }
+
+    /// <summary>
+    /// Each loan's regular payment in a month from this one on, by the payoff plan: its full payment until the month
+    /// it's paid off, what's left on it in that month, and nothing after. Loans already paid off get nothing.
+    /// Null for months before this one.
+    /// </summary>
+    private async Task<Dictionary<int, decimal>?> LoanPaymentsAsync(int year, int month)
+    {
+        var first = Dates.ThisMonth;
+        var index = (year - first.Year) * 12 + month - first.Month;
+        if (index < 0) return null;
+        var payments = (await db.RecurringDebts.PaidOffLoans().Select(d => d.Id).ToListAsync()).ToDictionary(id => id, _ => 0m);
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        if (loans.Count == 0) return payments;
+        var settings = await db.GetDebtPlanAsync();
+        var plan = DebtPlanner.Plan(loans.Select(d => d.ToDebtInput()).ToList(), settings.Strategy, settings.Snowball, first, settings.LumpSums);
+        foreach (var loan in loans) payments[loan.Id] = DebtPlanner.RegularPayment(plan, loan.Id, index);
+        return payments;
+    }
+
+    /// <summary>
+    /// Fits a month's unpaid loan payments to the payoff plan: in the month a loan is paid off its payment is what's
+    /// left on it (marked as the last payment), and after that it comes off the budget. In this month, a payment on
+    /// a payday that has passed is kept. A payment whose amount was changed by hand is only removed, never resized.
+    /// </summary>
+    private async Task FitLoanPaymentsAsync(MonthlyBudget budget, Dictionary<int, decimal> payments)
+    {
+        var copies = budget.Expenses.Where(e => e.RecurringDebtId is int id && payments.ContainsKey(id) && e.Status == PaymentStatus.NotPaid).ToList();
+        if (copies.Count == 0) return;
+        var ids = copies.Select(e => e.RecurringDebtId!.Value).Distinct().ToList();
+        var loans = await db.RecurringDebts.Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id);
+        var payDates = budget.PayPeriods.ToDictionary(p => p.Id, p => p.PayDate.Date);
+        foreach (var e in copies)
+        {
+            var loan = loans[e.RecurringDebtId!.Value];
+            var pay = payments[loan.Id];
+            if (pay <= 0)
+            {
+                var passed = budget.FirstDay == Dates.ThisMonth && e.PayPeriodId is int p && payDates.TryGetValue(p, out var date) && date < DateTime.Today;
+                if (passed) continue;
+                budget.Expenses.Remove(e);
+                db.BudgetExpenses.Remove(e);
+            }
+            else if (pay < loan.Amount && (e.IsFinalPayment || e.Amount == loan.Amount))
+            {
+                e.Amount = pay;
+                e.IsFinalPayment = true;
+            }
+            else if (pay >= loan.Amount && e.IsFinalPayment)
+            {
+                e.Amount = loan.Amount;
+                e.IsFinalPayment = false;
+            }
+        }
+        await db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -332,7 +392,14 @@ public class BudgetBuilder(BudgetDbContext db)
         var settings = await db.GetDebtPlanAsync();
         var loans = await db.RecurringDebts.Loans().ToListAsync();
         var first = Dates.ThisMonth;
-        if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly || budget.FirstDay < first) return;
+        if (budget.FirstDay < first) return;
+        if (await LoanPaymentsAsync(budget.Year, budget.Month) is { } loanPayments) await FitLoanPaymentsAsync(budget, loanPayments);
+        if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly) return;
+        // The plan's snowball this month: the monthly extra plus what loans paid off before now used to take.
+        var inputs = loans.Select(d => d.ToDebtInput()).ToList();
+        var monthIndex = (budget.Year - first.Year) * 12 + budget.Month - first.Month;
+        var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.Snowball, first, settings.LumpSums);
+        var snowball = DebtPlanner.MonthlySnowball(plan, monthIndex, settings.LumpSumsIn(budget.Year, budget.Month));
 
         var columns = new MonthViewModel { Year = budget.Year, Month = budget.Month, Budget = budget }.Columns.Where(c => !c.IsUnassigned).ToList();
         if (columns.Count == 0) return;
@@ -365,26 +432,27 @@ public class BudgetBuilder(BudgetDbContext db)
         foreach (var lump in lumps)
             wanted[ColumnOn(lump.Date)] += lump.Amount;
         var monthly = new decimal[columns.Count];
-        if (settings.ExtraMonthly > 0)
+        if (snowball > 0)
         {
             var paycheck = ChosenPaycheck(budget, settings);
             if (paycheck is not null)
-                monthly[columns.FindIndex(c => c.Paychecks.Any(p => p.Id == paycheck.Id))] += settings.ExtraMonthly;
+                monthly[columns.FindIndex(c => c.Paychecks.Any(p => p.Id == paycheck.Id))] += snowball;
             else
             {
                 // Spread over the paydays that can take it, by what each would have left with no extra on it.
                 var open = Enumerable.Range(0, columns.Count).Where(i => Open(columns[i])).ToList();
                 if (open.Count == 0) open = [columns.Count - 1];
-                var shares = DebtExtraSplitter.Spread(open.Select(i => columns[i].LeftOver + KeptOn(kept, columns[i]) - wanted[i]).ToList(), settings.ExtraMonthly);
+                var shares = DebtExtraSplitter.Spread(open.Select(i => columns[i].LeftOver + KeptOn(kept, columns[i]) - wanted[i]).ToList(), snowball);
                 for (var k = 0; k < open.Count; k++) monthly[open[k]] += shares[k];
             }
         }
 
         for (var i = 0; i < columns.Count; i++) wanted[i] += monthly[i];
         // Monthly extra money from outside the paychecks counts as income on the payday it's paid from (added
-        // below, once there's a loan to pay it to).
+        // below, once there's a loan to pay it to). Payments freed up by paid-off loans already come out of the paychecks.
         var monthlyIncome = new List<PayPeriodExtra>();
-        if (settings.ExtraMonthlyIsIncome)
+        var incomePart = snowball > 0 ? Math.Min(1, settings.ExtraMonthly / snowball) : 0;
+        if (settings.ExtraMonthlyIsIncome && incomePart > 0)
             for (var i = 0; i < columns.Count; i++)
             {
                 if (monthly[i] <= 0) continue;
@@ -392,7 +460,7 @@ public class BudgetBuilder(BudgetDbContext db)
                 while (at < columns.Count - 1 && Passed(columns[at])) at++;
                 monthlyIncome.Add(new PayPeriodExtra
                 {
-                    PayPeriodId = columns[at].Paychecks[0].Id, Amount = monthly[i], FromDebtExtra = true, Description = "Extra for debt"
+                    PayPeriodId = columns[at].Paychecks[0].Id, Amount = Math.Round(monthly[i] * incomePart, 2), FromDebtExtra = true, Description = "Extra for debt"
                 });
             }
 
@@ -410,17 +478,14 @@ public class BudgetBuilder(BudgetDbContext db)
         if (give.Count == 0) return;
 
         // Each loan's balance at the start of this month, as the payoff plan projects it from today's balances.
-        var inputs = loans.Select(d => d.ToDebtInput()).ToList();
         var startBalances = DebtPlanner.StartBalances(inputs, settings, first, budget.Year, budget.Month);
         var keptByLoan = kept.GroupBy(e => e.ExtraForDebtId!.Value).ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
         // First the loan the payoff plan sends extra to this month, up to what the plan gives it; then the plan's
         // order, up to what each loan still owes.
-        var monthIndex = (budget.Year - first.Year) * 12 + budget.Month - first.Month;
-        var plan = DebtPlanner.Plan(inputs, settings.Strategy, settings.ExtraMonthly, first, settings.LumpSums);
         var planned = monthIndex < plan.Schedule.Count ? plan.Schedule[monthIndex].Extra : new Dictionary<int, decimal>();
         var targets = planned.Select(x => (Id: x.Key, Capacity: Math.Max(0, x.Value - keptByLoan.GetValueOrDefault(x.Key)))).ToList();
         targets.AddRange(plan.Debts.Select(o => o.Debt).Select(d => (d.Id, Capacity: Math.Max(0,
-            startBalances.GetValueOrDefault(d.Id) - d.MinPayment - keptByLoan.GetValueOrDefault(d.Id) - planned.GetValueOrDefault(d.Id)))));
+            startBalances.GetValueOrDefault(d.Id) - DebtPlanner.RegularPayment(plan, d.Id, monthIndex) - keptByLoan.GetValueOrDefault(d.Id) - planned.GetValueOrDefault(d.Id)))));
         targets = targets.Where(t => t.Capacity > 0).ToList();
         if (targets.Count == 0) return;
 
@@ -438,6 +503,20 @@ public class BudgetBuilder(BudgetDbContext db)
             });
         }
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// The extra the payoff plan pays in a month beyond its one-time extras: the monthly extra plus the payments
+    /// freed up by paid-off loans.
+    /// </summary>
+    public async Task<decimal> SnowballInAsync(int year, int month)
+    {
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        var settings = await db.GetDebtPlanAsync();
+        if (loans.Count == 0 || settings.Strategy == PayoffStrategy.MinimumOnly) return 0;
+        var first = Dates.ThisMonth;
+        var plan = DebtPlanner.Plan(loans.Select(d => d.ToDebtInput()).ToList(), settings.Strategy, settings.Snowball, first, settings.LumpSums);
+        return DebtPlanner.MonthlySnowball(plan, (year - first.Year) * 12 + month - first.Month, settings.LumpSumsIn(year, month));
     }
 
     // Extra payments added by hand come on top of the plan's, so they don't count toward a payday's share.

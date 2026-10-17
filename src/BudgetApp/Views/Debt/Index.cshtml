@@ -82,6 +82,10 @@
                         <span class="input-group-text">$</span>
                         <input class="form-control" id="extraMonthly" name="extraMonthly" type="number" step="0.01" min="0" inputmode="decimal" value="@Model.Settings.ExtraMonthly.ToString("0.##")" />
                     </div>
+                    @if (Model.Settings.PaidOffPayments > 0)
+                    {
+                        <div class="form-text" id="paidOffRoll">Plus @Model.Settings.PaidOffPayments.ToString("C") a month freed up by paid-off @(Model.Settings.PaidOffLoans.Count == 1 ? "loan" : "loans") (@string.Join(", ", Model.Settings.PaidOffLoans)), so the snowball is @Model.Settings.Snowball.ToString("C").</div>
+                    }
                     <label class="form-label small mt-2 mb-1" for="extraPayday">Paid from</label>
                     <select class="form-select form-select-sm" id="extraPayday" name="extraPayday">
                         <option value="spread" selected="@(picked == "spread")">Spread over the paydays (evens out what's left)</option>
