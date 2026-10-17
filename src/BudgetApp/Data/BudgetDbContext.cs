@@ -12,6 +12,7 @@ public class BudgetDbContext(DbContextOptions<BudgetDbContext> options)
 {
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
+    public DbSet<WhatIfQuestion> WhatIfQuestions => Set<WhatIfQuestion>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<BudgetRules> BudgetRules => Set<BudgetRules>();
     public DbSet<DebtPlanSettings> DebtPlanSettings => Set<DebtPlanSettings>();

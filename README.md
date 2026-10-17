@@ -200,6 +200,17 @@ reads the amount owed, APR, minimum payment and any promos. You review it next t
 and pick what to save and which promo to plan around. The file is sent to the AI and not stored. This uses the
 same `Anthropic:ApiKey` as the AI helper.
 
+### What If
+
+*What If* on Debt Payoff takes a question in plain words, such as "what if I refinance my HELOC at 7% and roll all
+my other debt into it?", and compares the answer with your plan: total interest, debt-free date and what you pay
+each month, with the loans before and after. The AI helper only turns the question into changes (new rates,
+loans rolled together, a fee or term, more extra, a lump sum); the payoff math is the same as the plan's. When a
+loan is rolled in, its payment stays what the old payments added up to unless the question gives a term or
+payment. If the payments go down, it also shows what happens if you keep paying what you pay now. Questions are
+kept on the What If page and worked out again with your latest balances when you open one. Nothing on your plan
+changes.
+
 ## AI helper (optional)
 
 The **Suggest arrangement** button on a month page asks Claude to look at that month's paydays and

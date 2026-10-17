@@ -4,11 +4,12 @@ using BudgetApp.Models;
 using BudgetApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace BudgetApp.Controllers;
 
 /// <summary>Debt statistics and payoff plans for bills that have an amount owed (loans, cards).</summary>
-public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthService months) : Controller
+public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthService months, WhatIfAdvisor whatIf) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -28,8 +29,9 @@ public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthServ
         ViewBag.ThisMonth = month;
         ViewBag.ExtraThisMonth = month is null ? new List<BudgetExpense>()
             : await db.BudgetExpenses.Include(e => e.PayPeriod).Include(e => e.ExtraForDebt)
-                .Where(e => e.MonthlyBudgetId == month.Id && e.ExtraForDebtId != null)
+                .Where(e => e.MonthlyBudgetId == month.Id && e.ExtraForDebtId != null && !(e.ExtraPinned && e.Amount == 0))
                 .OrderBy(e => e.PayPeriod!.PayDate).ThenBy(e => e.Title).ToListAsync();
+        ViewBag.WhatIfs = await db.WhatIfQuestions.OrderByDescending(q => q.AskedAt).Take(5).ToListAsync();
         return View(DebtPageModel.Build(loans, settings));
     }
 
@@ -67,5 +69,76 @@ public class DebtController(BudgetDbContext db, BudgetBuilder builder, MonthServ
         await builder.SpreadDebtExtraAsync();
         TempData["Message"] = "Saved the amounts owed.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ----- What if -----
+
+    /// <summary>The What If page: questions asked so far, and the answer to one of them worked out with today's loans.</summary>
+    public async Task<IActionResult> WhatIf(int? id)
+    {
+        ViewBag.Questions = await db.WhatIfQuestions.OrderByDescending(q => q.AskedAt).ToListAsync();
+        var question = id is int qid ? await db.WhatIfQuestions.FindAsync(qid) : null;
+        if (id is not null && question is null) return NotFound();
+        ViewBag.Question = question;
+        if (question is null) return View();
+
+        var scenario = JsonSerializer.Deserialize<WhatIfScenario>(question.ScenarioJson)!;
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        var settings = await db.GetDebtPlanAsync();
+        return View(WhatIfCalculator.Run(loans.Select(l => l.ToDebtInput()).ToList(), settings, scenario, Dates.ThisMonth.AddMonths(1)));
+    }
+
+    /// <summary>Has the AI helper turn a what-if question into changes to the loans, then shows the answer.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> AskWhatIf(string? question, CancellationToken ct)
+    {
+        question = question?.Trim();
+        if (string.IsNullOrEmpty(question))
+        {
+            TempData["Error"] = "Type a what-if question first.";
+            return RedirectToAction(nameof(WhatIf));
+        }
+        if (question.Length > 1000) question = question[..1000];
+        var loans = await db.RecurringDebts.Loans().ToListAsync();
+        if (loans.Count == 0)
+        {
+            TempData["Error"] = "Add your loans first; what-if questions are worked out from them.";
+            return RedirectToAction(nameof(WhatIf));
+        }
+        try
+        {
+            var scenario = await whatIf.AskAsync(question, loans, await db.GetDebtPlanAsync(), ct);
+            if (scenario.Unsupported is not null && scenario.LoanChanges.Count + scenario.Consolidations.Count + scenario.NewLoans.Count == 0
+                && scenario.ExtraMonthly is null && scenario.Strategy is null && scenario.OneTimeAmount is null)
+            {
+                TempData["Error"] = "That one can't be worked out here: " + scenario.Unsupported;
+                TempData["WhatIfQuestion"] = question;
+                return RedirectToAction(nameof(WhatIf));
+            }
+            var saved = new WhatIfQuestion
+            {
+                Question = question, Title = scenario.Title, ScenarioJson = JsonSerializer.Serialize(scenario), AskedAt = DateTime.Now
+            };
+            db.WhatIfQuestions.Add(saved);
+            await db.SaveChangesAsync();
+            return RedirectToAction(nameof(WhatIf), new { id = saved.Id });
+        }
+        catch (AdvisorException ex)
+        {
+            TempData["Error"] = ex.Message;
+            TempData["WhatIfQuestion"] = question;
+            return RedirectToAction(nameof(WhatIf));
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteWhatIf(int id)
+    {
+        if (await db.WhatIfQuestions.FindAsync(id) is { } q)
+        {
+            db.WhatIfQuestions.Remove(q);
+            await db.SaveChangesAsync();
+        }
+        return RedirectToAction(nameof(WhatIf));
     }
 }

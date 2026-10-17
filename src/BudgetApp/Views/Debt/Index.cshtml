@@ -201,6 +201,25 @@
     </div>
 </div>
 
+@if (plan is not null)
+{
+    var whatIfs = (List<WhatIfQuestion>)ViewBag.WhatIfs;
+    <!-- What If: ask about a change (a refinance, consolidating, more extra) and compare it with this plan. -->
+    <div class="card mb-3" id="whatIfCard"><div class="card-body">
+        <h2 class="h5"><i class="bi bi-signpost-split me-1"></i> What If</h2>
+        <form asp-action="AskWhatIf" method="post" class="d-flex flex-wrap gap-2" onsubmit="this.querySelector('.whatif-busy').classList.remove('d-none')">
+            <input class="form-control flex-grow-1 w-auto" name="question" maxlength="1000" required
+                   placeholder="What if I refinance my HELOC at 7% and consolidate my other debt into it?" />
+            <button class="btn btn-ai"><i class="bi bi-stars me-1"></i> Work it out</button>
+            <span class="small text-muted align-self-center d-none whatif-busy"><span class="spinner-border spinner-border-sm me-1"></span> Working it out…</span>
+        </form>
+        <div class="small mt-2">
+            @foreach (var q in whatIfs) { <a asp-action="WhatIf" asp-route-id="@q.Id" class="me-3 text-decoration-none"><i class="bi bi-arrow-return-right"></i> @q.Title</a> }
+            <a asp-action="WhatIf" class="text-decoration-none">@(whatIfs.Count > 0 ? "All questions" : "More about What If")</a>
+        </div>
+    </div></div>
+}
+
 @if (plan is not null && plan.Promos.Count > 0)
 {
     <!-- Promo deadlines: the plan pays each promo balance off before its promo ends when the money allows. -->
