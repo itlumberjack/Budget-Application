@@ -201,6 +201,36 @@
     </div>
 </div>
 
+@if (plan is not null && plan.Promos.Count > 0)
+{
+    <!-- Promo deadlines: the plan pays each promo balance off before its promo ends when the money allows. -->
+    <div class="card mb-3" id="promoChecks">
+        <div class="card-header"><i class="bi bi-hourglass-split me-1"></i> Promo deadlines</div>
+        <ul class="list-group list-group-flush">
+            @foreach (var p in plan.Promos.OrderBy(p => p.EndDate))
+            {
+                <li class="list-group-item d-flex gap-2 align-items-start">
+                    <i class="bi @(p.ClearsInTime ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-danger") mt-1"></i>
+                    <div>
+                        <strong>@p.Name</strong>: @p.PromoBalance.ToString("C") at @p.Rate.ToString("0.###")% until @p.EndDate.ToString("MMMM d, yyyy")@(p.DeferredInterest ? " (deferred interest)" : "").
+                        @if (p.ClearsInTime)
+                        {
+                            <span class="d-block small text-success">This plan pays it off in @p.ClearedMonth!.Value.ToString("MMMM yyyy"), before the promo ends.</span>
+                        }
+                        else
+                        {
+                            <span class="d-block small text-danger">
+                                This plan leaves @p.LeftAtEnd.ToString("C") when the promo ends. It takes about @p.NeededMonthly.ToString("C") a month on this loan to clear it in time; raise Extra each month to get there.
+                                @if (p.DeferredInterestCharged > 0) { <text>Missing it adds about @p.DeferredInterestCharged.ToString("C") of deferred interest.</text> }
+                            </span>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
 @if (plan is not null)
 {
     <!-- Payoff order -->
@@ -214,7 +244,8 @@
                 {
                     <tr>
                         <td>@o.Order</td>
-                        <td class="fw-semibold">@o.Debt.Name</td>
+                        <td class="fw-semibold"><a asp-controller="RecurringDebts" asp-action="Edit" asp-route-id="@o.Debt.Id" class="text-reset">@o.Debt.Name</a>
+                            @if (o.Debt.Promo is { } promo) { <span class="badge badge-snowball fw-normal" title="Promotional rate">@promo.Rate.ToString("0.###")% until @promo.EndDate.ToString("MMM yyyy")</span> }</td>
                         <td class="text-end money">@o.Debt.Balance.ToString("C")</td>
                         <td class="text-end money owed-month">@(((Dictionary<int, decimal>)ViewBag.OwedAfterMonth).TryGetValue(o.Debt.Id, out var endOfMonth) ? endOfMonth.ToString("C") : "")</td>
                         <td class="text-end">@o.Debt.Apr.ToString("0.###")%</td>

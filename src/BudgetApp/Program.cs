@@ -55,7 +55,9 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 builder.Services.AddScoped<BudgetBuilder>();
 builder.Services.AddScoped<MonthService>();
 // The optional AI helper on the month page. Needs Anthropic:ApiKey (see README).
-builder.Services.AddHttpClient<BudgetAdvisor>(c => c.Timeout = TimeSpan.FromMinutes(2));
+builder.Services.AddHttpClient<ClaudeApi>(c => c.Timeout = TimeSpan.FromMinutes(3));
+builder.Services.AddScoped<BudgetAdvisor>();
+builder.Services.AddScoped<StatementReader>();
 
 var app = builder.Build();
 

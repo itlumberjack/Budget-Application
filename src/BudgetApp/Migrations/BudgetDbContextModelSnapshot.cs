@@ -445,6 +445,18 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("PayoffPriority")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("PromoBalance")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<bool>("PromoDeferredInterest")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("PromoEndDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("PromoRate")
+                        .HasColumnType("decimal(6,3)");
+
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime(6)");
 

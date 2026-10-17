@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BudgetApp.Controllers;
 
 /// <summary>The Bills &amp; Expenses page: bills, living expenses and loans that repeat. Each month's budget gets a copy.</summary>
-public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder) : Controller
+public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder, StatementReader statements) : Controller
 {
     public async Task<IActionResult> Index() =>
         View(await db.RecurringDebts.Include(d => d.Category)
@@ -92,6 +92,80 @@ public class RecurringDebtsController(BudgetDbContext db, BudgetBuilder builder)
             await db.SaveChangesAsync();
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Has the AI read an uploaded loan statement and shows what it found next to what the loan has now.
+    /// Nothing changes until the user picks what to keep (ApplyStatement). The file isn't stored.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(StatementReader.MaxBytes + 1024 * 1024)]
+    public async Task<IActionResult> ReadStatement(int id, IFormFile? statement, CancellationToken ct)
+    {
+        var loan = await db.RecurringDebts.FindAsync(id);
+        if (loan is null) return NotFound();
+        if (statement is null || statement.Length == 0)
+        {
+            TempData["Error"] = "Pick the statement file first.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+        try
+        {
+            using var buffer = new MemoryStream();
+            await statement.CopyToAsync(buffer, ct);
+            var findings = await statements.ReadAsync(loan, statement.FileName, buffer.ToArray(), ct);
+            ViewBag.Loan = loan;
+            return View("Statement", findings);
+        }
+        catch (AdvisorException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+    }
+
+    /// <summary>Saves the parts of a statement the user kept: amount owed, rate, minimum payment and the promo.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApplyStatement(int id, DateTime? statementDate,
+        bool useBalance, decimal? balance, bool useApr, decimal? apr, bool useMinimum, decimal? minimum,
+        string? promo, decimal? promoRate, decimal? promoBalance, DateTime? promoEnd, bool promoDeferred)
+    {
+        var loan = await db.RecurringDebts.FindAsync(id);
+        if (loan is null) return NotFound();
+        var changed = new List<string>();
+        if (useBalance && balance is >= 0)
+        {
+            loan.Balance = balance;
+            loan.BalanceAsOf = statementDate ?? DateTime.Today;
+            changed.Add("amount owed");
+        }
+        if (useApr && apr is >= 0 and <= 100) { loan.InterestRate = apr; changed.Add("interest rate"); }
+        var minimumChanged = useMinimum && minimum is > 0 && minimum != loan.Amount;
+        if (minimumChanged) { loan.Amount = minimum!.Value; changed.Add("payment"); }
+        if (promo == "use" && promoEnd is not null)
+        {
+            loan.PromoRate = Math.Clamp(promoRate ?? 0, 0, 100);
+            loan.PromoBalance = promoBalance is >= 0 && promoBalance < loan.Balance ? promoBalance : null;
+            loan.PromoEndDate = promoEnd;
+            loan.PromoDeferredInterest = promoDeferred;
+            changed.Add("promo");
+        }
+        else if (promo == "clear" && loan.PromoEndDate is not null)
+        {
+            loan.ClearPromo();
+            changed.Add("promo (removed)");
+        }
+        await db.SaveChangesAsync();
+        // A new payment goes to this month's and later months' unpaid copies; the extra payment is spread again.
+        if (minimumChanged)
+        {
+            var lastMonth = Helpers.Dates.ThisMonth.AddMonths(-1);
+            await builder.CarryForwardAsync(loan.Id, lastMonth.Year, lastMonth.Month, null, dueDayChanged: false);
+        }
+        await builder.SpreadDebtExtraAsync();
+        TempData["Message"] = changed.Count == 0
+            ? $"Nothing changed on {loan.Title}."
+            : $"Updated {loan.Title}'s {string.Join(", ", changed)} from the statement.";
+        return RedirectToAction(nameof(Edit), new { id });
     }
 
     private async Task LoadCategoriesAsync()

@@ -67,7 +67,7 @@ public class MonthService(BudgetDbContext db, BudgetBuilder builder)
         if (budget.FirstDay < Dates.ThisMonth || !budget.Expenses.Any(e => e.ExtraForDebtId != null || e.RecurringDebtId != null)) return new();
         var loans = await db.RecurringDebts.Loans().ToListAsync();
         if (loans.Count == 0) return new();
-        var inputs = loans.Select(d => new DebtInput(d.Id, d.Title, d.Balance!.Value, d.InterestRate ?? 0, d.MonthlyAmount, d.PayoffPriority)).ToList();
+        var inputs = loans.Select(d => d.ToDebtInput()).ToList();
         var start = DebtPlanner.StartBalances(inputs, await db.GetDebtPlanAsync(), Dates.ThisMonth, budget.Year, budget.Month);
         return DebtPlanner.OwedAfterEachPayment(budget, start);
     }

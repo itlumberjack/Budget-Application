@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,9 +11,9 @@ namespace BudgetApp.Services;
 /// and bills are paid before they're due. It only suggests; nothing changes until the user applies it.
 /// Needs Anthropic:ApiKey in configuration (user secrets or the Anthropic__ApiKey environment variable).
 /// </summary>
-public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<BudgetAdvisor> logger)
+public class BudgetAdvisor(ClaudeApi claude)
 {
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(config["Anthropic:ApiKey"]);
+    public bool IsConfigured => claude.IsConfigured;
 
     private const string SystemPrompt = """
         You help a household arrange a monthly budget. The month is split into columns, one per payday
@@ -72,75 +71,7 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
             throw new AdvisorException("This month has no paydays yet, so there's nothing to arrange.");
         var expenses = month.Budget!.Expenses;
 
-        var request = new JsonObject
-        {
-            ["model"] = config["Anthropic:Model"] ?? "claude-opus-5-5",
-            ["max_tokens"] = 16000,
-            ["system"] = SystemPrompt,
-            ["output_config"] = new JsonObject
-            {
-                ["effort"] = "medium",
-                ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = AnswerSchema.DeepClone() }
-            },
-            ["messages"] = new JsonArray(new JsonObject
-            {
-                ["role"] = "user",
-                ["content"] = DescribeMonth(month, columns)
-            })
-        };
-
-        var baseUrl = (config["Anthropic:BaseUrl"] ?? "https://api.anthropic.com").TrimEnd('/');
-        using var message = new HttpRequestMessage(HttpMethod.Post, baseUrl + "/v1/messages")
-        {
-            Content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json")
-        };
-        message.Headers.Add("x-api-key", config["Anthropic:ApiKey"]);
-        message.Headers.Add("anthropic-version", "2023-06-01");
-        message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await http.SendAsync(message, ct);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-        {
-            logger.LogWarning(ex, "Could not reach the Anthropic API");
-            throw new AdvisorException("Couldn't reach the AI service. Check the internet connection and try again.");
-        }
-
-        var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.LogWarning("Anthropic API returned {Status}: {Body}", (int)response.StatusCode, body);
-            var detail = ApiErrorMessage(body);
-            throw new AdvisorException((int)response.StatusCode switch
-            {
-                401 or 403 => "The AI service didn't accept the API key. Check Anthropic:ApiKey.",
-                429 => "The AI service is busy or the account is out of credit. Try again in a minute.",
-                _ => "The AI service turned the request down" + (detail is null ? "." : ": " + detail)
-            });
-        }
-
-        var reply = JsonNode.Parse(body);
-        var stopReason = (string?)reply?["stop_reason"];
-        if (stopReason == "refusal")
-            throw new AdvisorException("The AI declined to answer this one. Try again.");
-        if (stopReason == "max_tokens")
-            throw new AdvisorException("The AI's answer was cut off. Try again.");
-
-        // Thinking blocks may come first; the answer is the text block.
-        var text = reply?["content"]?.AsArray()
-            .Where(c => (string?)c?["type"] == "text")
-            .Select(c => (string?)c?["text"])
-            .LastOrDefault();
-        JsonNode? input = null;
-        try { input = text is null ? null : JsonNode.Parse(text); } catch (JsonException) { }
-        if (input is null)
-        {
-            logger.LogWarning("Unexpected Anthropic API reply: {Body}", body);
-            throw new AdvisorException("The AI didn't send back a suggestion. Try again.");
-        }
+        var input = await claude.AskAsync(claude.NewRequest(SystemPrompt, DescribeMonth(month, columns), AnswerSchema), ct);
 
         // Keep only moves that make sense for this month: an unpaid bill, a real column, a different one.
         var moves = new List<SuggestedMove>();
@@ -160,13 +91,6 @@ public class BudgetAdvisor(HttpClient http, IConfiguration config, ILogger<Budge
         }
 
         return new ArrangementSuggestion((string?)input["summary"] ?? "", moves, ColumnOutcome.For(columns, moves));
-    }
-
-    /// <summary>The "message" from an API error body, if there is one.</summary>
-    private static string? ApiErrorMessage(string body)
-    {
-        try { return (string?)JsonNode.Parse(body)?["error"]?["message"]; }
-        catch (JsonException) { return null; }
     }
 
     /// <summary>The month as plain text for the prompt.</summary>
