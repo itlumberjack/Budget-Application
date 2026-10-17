@@ -61,6 +61,11 @@ public class MonthViewModel
         Budget?.Expenses.Where(e => e.Status == status).Sum(e => e.Amount) ?? 0;
     public decimal Remaining => TotalIncome - TotalExpenses;
 
+    public bool HasPlan => Budget?.HasPlan ?? false;
+    public decimal PlannedIncome => Budget?.PayPeriods.Sum(p => p.PlannedIncome ?? 0) ?? 0;
+    public decimal PlannedExpenses => Budget?.PayPeriods.Sum(p => p.PlannedSpending ?? 0) ?? 0;
+    public decimal PlannedRemaining => PlannedIncome - PlannedExpenses;
+
     /// <summary>The month's buffer and each partner's share, added up over its paydays.</summary>
     public LeftoverSplit TotalSplit => LeftoverSplit.Sum(Columns.Where(c => !c.IsUnassigned).Select(c => Household.Split(c.LeftOver)));
 }

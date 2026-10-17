@@ -47,6 +47,9 @@ namespace BudgetApp.Migrations
                     b.Property<int?>("PayPeriodId")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("PlannedAmount")
+                        .HasColumnType("decimal(12,2)");
+
                     b.Property<int?>("RecurringDebtId")
                         .HasColumnType("int");
 
@@ -312,6 +315,9 @@ namespace BudgetApp.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
 
+                    b.Property<DateTime?>("PlanSavedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("Year")
                         .HasColumnType("int");
 
@@ -348,6 +354,12 @@ namespace BudgetApp.Migrations
 
                     b.Property<DateTime>("PayDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("PlannedIncome")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal?>("PlannedSpending")
+                        .HasColumnType("decimal(12,2)");
 
                     b.HasKey("Id");
 

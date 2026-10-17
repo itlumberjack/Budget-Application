@@ -59,6 +59,19 @@ public class MonthService(BudgetDbContext db, BudgetBuilder builder)
     }
 
     /// <summary>
+    /// Saves the month as it stands as its original plan. With onlyIfMissing (used when a bill is first marked
+    /// pending or complete), a plan that's already saved is kept.
+    /// </summary>
+    public async Task SavePlanAsync(int budgetId, bool onlyIfMissing = false)
+    {
+        var budget = await db.MonthlyBudgets.Include(b => b.PayPeriods).ThenInclude(p => p.Extras).Include(b => b.Expenses)
+            .FirstOrDefaultAsync(b => b.Id == budgetId);
+        if (budget is null || budget.IsArchived || (onlyIfMissing && budget.HasPlan)) return;
+        budget.SavePlan(DateTime.Now);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
     /// Moves bills to other paychecks in the same month (from Even out, the AI helper, or the phone app).
     /// Moves naming a bill or paycheck from another month are skipped. Returns how many bills moved.
     /// </summary>

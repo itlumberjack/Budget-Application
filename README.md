@@ -95,6 +95,16 @@ same amount left over. A bill only moves to a payday on or before its due day (o
 so nothing is paid late. Like the AI helper, it only suggests: uncheck any move you don't want and click
 **Apply selected**.
 
+## Plan vs now
+
+Each month keeps its original plan. The plan is saved the first time a bill in that month is marked pending or
+complete, or straight away with **Save the plan now** above the paydays. After that, the bottom of every payday
+shows the plan and where it stands now side by side (income, spending and left over) plus what's paid, pending and
+not paid yet, and what's left in the account once paid and pending bills are out. These update as soon as a status
+dot is clicked. A bill whose amount changed shows its planned amount under it, and one added later says "not in
+plan". **Make this the plan** replaces the saved plan with the month as it stands. The phone API returns the same
+numbers (Plan and Now on each payday, PlannedAmount on each bill) and `POST /api/months/{id}/plan` saves the plan.
+
 ## Moving bills and marking them paid
 
 - **Drag a bill** to another payday's column to move it. While dragging, paydays after the bill's due date

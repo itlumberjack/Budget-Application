@@ -92,6 +92,13 @@
         <div class="card stat @(Model.Remaining < 0 ? "border border-danger" : "")">
             <div class="label"><span class="stat-icon icon-left"><i class="bi bi-piggy-bank"></i></span> Left over</div>
             <div class="value money mt-1 @(Model.Remaining < 0 ? "text-danger" : "text-success")">@Model.Remaining.ToString("C")</div>
+            @if (Model.HasPlan)
+            {
+                var change = Model.Remaining - Model.PlannedRemaining;
+                <div class="hint plan-hint">Plan <span class="money">@Model.PlannedRemaining.ToString("C")</span>
+                    @if (change != 0) { <span class="money @(change < 0 ? "text-danger" : "text-success")">(@(change > 0 ? "+" : "−")@Math.Abs(change).ToString("C"))</span> }
+                </div>
+            }
             @if (split.Shared > 0)
             {
                 <div class="hint">@Model.Household.FirstPartnerName <span class="money">@split.First.ToString("C")</span> &middot; @Model.Household.SecondPartnerName <span class="money">@split.Second.ToString("C")</span> &middot; buffer <span class="money">@split.Buffer.ToString("C")</span></div>
@@ -102,6 +109,32 @@
             }
         </div>
     </div>
+    @if (!b.IsArchived || Model.HasPlan)
+    {
+        <div class="col-12">
+            <div class="plan-bar d-flex flex-wrap align-items-center gap-2 small text-muted" id="planBar">
+                <i class="bi bi-clipboard-data"></i>
+                <span class="flex-grow-1">
+                    @if (Model.HasPlan)
+                    {
+                        @:Each payday shows the plan saved @b.PlanSavedAt!.Value.ToString("MMM d 'at' h:mm tt") next to where it stands now.
+                    }
+                    else
+                    {
+                        @:The plan is saved when you mark the first bill pending or complete. After that, each payday shows the plan next to where it stands now.
+                    }
+                </span>
+                @if (!b.IsArchived)
+                {
+                    <form asp-action="SavePlan" method="post"
+                          onsubmit="return @(Model.HasPlan ? "confirm('Replace the saved plan with this month as it stands now?')" : "true");">
+                        <input type="hidden" name="id" value="@b.Id" />
+                        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-bookmark-check me-1"></i> @(Model.HasPlan ? "Make this the plan" : "Save the plan now")</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
 </div>
 
 <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3 mb-2">
@@ -244,7 +277,17 @@
                                     @if (e.RecurringDebtId is null) { <span class="badge text-bg-secondary">extra</span> }
                                 </td>
                                 <td>@e.Company</td>
-                                <td class="text-end money">@e.Amount.ToString("C")</td>
+                                <td class="text-end money">
+                                    @e.Amount.ToString("C")
+                                    @if (Model.HasPlan && e.PlannedAmount is decimal planned && planned != e.Amount)
+                                    {
+                                        <div class="plan-was" title="Amount in the plan">plan @planned.ToString("C")</div>
+                                    }
+                                    else if (Model.HasPlan && e.PlannedAmount is null)
+                                    {
+                                        <div class="plan-was" title="Added after the plan was saved">not in plan</div>
+                                    }
+                                </td>
                                 <td class="status-cell">
                                     <form asp-action="SetStatus" method="post">
                                         <input type="hidden" name="id" value="@e.Id" />
@@ -266,15 +309,61 @@
         @foreach (var col in columns)
         {
             <div class="sheet-block sheet-summary" data-col="@columns.IndexOf(col)">
-                <table class="sheet-table">
-                    <tbody>
-                        <tr><td>Income</td><td class="text-end money">@col.Income.ToString("C")</td></tr>
-                        <tr><td>Spending</td><td class="text-end money">&minus; @col.Spending.ToString("C")</td></tr>
-                    </tbody>
-                    <tfoot>
-                        <tr><td>Left over</td><td class="text-end money @(col.LeftOver < 0 ? "text-danger" : "text-success")">@col.LeftOver.ToString("C")</td></tr>
-                    </tfoot>
-                </table>
+                @if (Model.HasPlan && !col.IsUnassigned)
+                {
+                    @* The original plan next to where this payday stands now. *@
+                    var change = col.LeftOver - col.PlannedLeftOver;
+                    <table class="sheet-table plan-table">
+                        <thead><tr><th></th><th class="text-end">Plan</th><th class="text-end">Now</th></tr></thead>
+                        <tbody>
+                            <tr><td>Income</td><td class="text-end money text-muted">@col.PlannedIncome.ToString("C")</td><td class="text-end money">@col.Income.ToString("C")</td></tr>
+                            <tr><td>Spending</td><td class="text-end money text-muted">&minus; @col.PlannedSpending.ToString("C")</td><td class="text-end money">&minus; @col.Spending.ToString("C")</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr><td>Left over</td>
+                                <td class="text-end money text-muted">@col.PlannedLeftOver.ToString("C")</td>
+                                <td class="text-end money @(col.LeftOver < 0 ? "text-danger" : "text-success")">@col.LeftOver.ToString("C")</td></tr>
+                            @if (change != 0)
+                            {
+                                <tr class="plan-change"><td colspan="3" class="text-end small @(change < 0 ? "text-danger" : "text-success")">
+                                    @Math.Abs(change).ToString("C") @(change < 0 ? "less" : "more") than planned</td></tr>
+                            }
+                        </tfoot>
+                    </table>
+                }
+                else
+                {
+                    <table class="sheet-table">
+                        <tbody>
+                            <tr><td>Income</td><td class="text-end money">@col.Income.ToString("C")</td></tr>
+                            <tr><td>Spending</td><td class="text-end money">&minus; @col.Spending.ToString("C")</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr><td>Left over</td><td class="text-end money @(col.LeftOver < 0 ? "text-danger" : "text-success")">@col.LeftOver.ToString("C")</td></tr>
+                        </tfoot>
+                    </table>
+                }
+                @if (Model.HasPlan && !col.IsUnassigned)
+                {
+                    @* Where the money from this payday is now, updated as bills are marked pending and complete. *@
+                    var paidPct = col.Spending > 0 ? (int)(col.Paid / col.Spending * 100) : 0;
+                    var pendPct = col.Spending > 0 ? (int)(col.Pending / col.Spending * 100) : 0;
+                    <div class="now-block">
+                        <div class="progress my-1" role="progressbar" aria-label="Share of this payday's bills paid or pending">
+                            <div class="progress-bar bg-complete" style="width:@paidPct%"></div>
+                            <div class="progress-bar bg-pending" style="width:@pendPct%"></div>
+                        </div>
+                        <table class="sheet-table small">
+                            <tbody>
+                                <tr><td><span class="swatch status-complete"></span> Paid</td><td class="text-end money">@col.Paid.ToString("C")</td></tr>
+                                <tr><td><span class="swatch status-pending"></span> Pending</td><td class="text-end money">@col.Pending.ToString("C")</td></tr>
+                                <tr><td><span class="swatch status-notpaid"></span> Not paid yet</td><td class="text-end money">@col.StillToPay.ToString("C")</td></tr>
+                                <tr class="fw-semibold"><td title="Income minus paid and pending bills">Left in the account now</td>
+                                    <td class="text-end money @(col.LeftNow < 0 ? "text-danger" : "")">@col.LeftNow.ToString("C")</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                }
                 @if (!col.IsUnassigned && col.LeftOver > 0)
                 {
                     var share = household.Split(col.LeftOver);

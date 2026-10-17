@@ -25,4 +25,15 @@ public class PayColumn
     public decimal Spending => Expenses.Sum(e => e.Amount);
     public decimal LeftOver => Income - Spending;
 
+    // Where things stand now: what's been paid, what's on its way, and what's left once paid bills are out.
+    public decimal Paid => Expenses.Where(e => e.Status == PaymentStatus.Complete).Sum(e => e.Amount);
+    public decimal Pending => Expenses.Where(e => e.Status == PaymentStatus.Pending).Sum(e => e.Amount);
+    public decimal StillToPay => Expenses.Where(e => e.Status == PaymentStatus.NotPaid).Sum(e => e.Amount);
+    public decimal LeftNow => Income - Paid - Pending;
+
+    // The original plan (paychecks added after it was saved count as planned at zero).
+    public decimal PlannedIncome => Paychecks.Sum(p => p.PlannedIncome ?? 0);
+    public decimal PlannedSpending => Paychecks.Sum(p => p.PlannedSpending ?? 0);
+    public decimal PlannedLeftOver => PlannedIncome - PlannedSpending;
+
 }
