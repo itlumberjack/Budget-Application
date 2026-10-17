@@ -90,7 +90,7 @@ public class WhatIfAdvisor(ClaudeApi claude)
                 (l.InterestRate ?? 0).ToString("0.###", CultureInfo.InvariantCulture) + "%", l.MonthlyAmount.ToString("0.00", CultureInfo.InvariantCulture),
                 l.Promo is { } p ? $"{p.Rate:0.###}% until {p.EndDate:yyyy-MM-dd}" : "-"));
         text.AppendLine($"Current plan: strategy {settings.Strategy}, extra {settings.ExtraMonthly.ToString("0.00", CultureInfo.InvariantCulture)} a month" +
-                        (settings.OneTimeAmount > 0 && settings.OneTimeMonth is DateTime m ? $", one-time {settings.OneTimeAmount:0.00} in {m:yyyy-MM}" : "") + ".");
+                        string.Concat(settings.LumpSums.Select(l => $", one-time {l.Amount.ToString("0.00", CultureInfo.InvariantCulture)} on {l.Date:yyyy-MM-dd}")) + ".");
         text.AppendLine().AppendLine("Question: " + question.Trim());
 
         var a = await claude.AskAsync(claude.NewRequest(SystemPrompt, text.ToString(), AnswerSchema), ct);

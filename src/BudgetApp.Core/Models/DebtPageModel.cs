@@ -28,7 +28,7 @@ public class DebtPageModel
         var firstMonth = Dates.ThisMonth.AddMonths(1);
 
         PayoffPlan Run(PayoffStrategy s) =>
-            DebtPlanner.Plan(inputs, s, settings.ExtraMonthly, firstMonth, settings.OneTimeAmount, settings.OneTimeMonth);
+            DebtPlanner.Plan(inputs, s, settings.ExtraMonthly, firstMonth, settings.LumpSums);
 
         var model = new DebtPageModel { Loans = loans, Settings = settings };
         if (inputs.Count > 0)

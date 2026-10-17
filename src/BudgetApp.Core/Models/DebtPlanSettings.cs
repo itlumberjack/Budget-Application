@@ -12,10 +12,19 @@ public class DebtPlanSettings : ISingleRow
     [Column(TypeName = "decimal(12,2)")]
     public decimal ExtraMonthly { get; set; }
 
-    /// <summary>A one-time extra payment (a "snowflake"), such as a tax refund.</summary>
-    [Column(TypeName = "decimal(12,2)")]
-    public decimal OneTimeAmount { get; set; }
-    public DateTime? OneTimeMonth { get; set; }
+    /// <summary>
+    /// The payday the monthly extra comes out of: the paycheck from this income (the ExtraPaydayNumber-th one in the
+    /// month, 0 for the last). Null spreads it over the month's paydays so they're left with about the same.
+    /// </summary>
+    public int? ExtraIncomeSourceId { get; set; }
+    public int ExtraPaydayNumber { get; set; }
+
+    /// <summary>One-time extra payments, each on its own date (DebtLumpSum rows, filled in by GetDebtPlanAsync).</summary>
+    [NotMapped]
+    public List<LumpSum> LumpSums { get; set; } = new();
+
+    /// <summary>The one-time extras in a month.</summary>
+    public decimal LumpSumsIn(int year, int month) => LumpSums.Where(l => l.Date.Year == year && l.Date.Month == month).Sum(l => l.Amount);
 
     /// <summary>
     /// No longer offered: loans used to be payable weekly or every two weeks. Kept so a schedule picked back then

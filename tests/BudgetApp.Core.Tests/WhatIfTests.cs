@@ -57,3 +57,19 @@ public class WhatIfTests
         Assert.Contains(result.Notes, n => n.Contains("Visa is paid off"));
     }
 }
+
+public class LumpSumTests
+{
+    [Fact]
+    public void Each_one_time_extra_lands_in_its_own_month()
+    {
+        var loan = new DebtInput(1, "Card", 5000, 20, 100, null);
+        var start = new DateTime(2026, 11, 1);
+        var plan = DebtPlanner.Plan([loan], PayoffStrategy.Avalanche, 0, start,
+            [new LumpSum(new DateTime(2026, 11, 20), 500), new LumpSum(new DateTime(2027, 2, 6), 800), new LumpSum(new DateTime(2026, 9, 1), 999)]);
+        Assert.Equal(500, plan.Schedule[0].Extra[1]);
+        Assert.False(plan.Schedule[1].Extra.ContainsKey(1));
+        Assert.Equal(800, plan.Schedule[3].Extra[1]); // February
+        Assert.Equal(1300, plan.Schedule.Sum(s => s.Extra.GetValueOrDefault(1)) - plan.Schedule.Skip(4).Sum(s => s.Extra.GetValueOrDefault(1)));
+    }
+}
