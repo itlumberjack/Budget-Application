@@ -1,0 +1,17 @@
+@* "Resync everything": rebuilds this month's and later budgets from Pay & Schedule, Bills & Expenses and Debt Payoff. *@
+<details class="resync">
+    <summary class="btn btn-outline-primary w-100"><i class="bi bi-arrow-clockwise me-1"></i> Resync everything</summary>
+    <form asp-controller="Budgets" asp-action="Resync" method="post" class="border rounded p-2 mt-2 text-start small" id="resyncForm"
+          onsubmit="this.querySelector('button').disabled = true; this.querySelector('.resync-busy').classList.remove('d-none')">
+        <input type="hidden" name="returnTo" value="@ViewData["ResyncReturn"]" />
+        <p class="mb-2">Brings this month and every later one up to date with Pay &amp; Schedule, Bills &amp; Expenses and Debt Payoff:
+            paychecks (amounts, dates and Brad's rule), missing bills, and the extra debt payments. Past paydays, anything
+            pending or complete, and paychecks you changed by hand stay as they are.</p>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="resetBills" value="true" id="resetBills" />
+            <label class="form-check-label" for="resetBills">Also reset unpaid bills to match Bills &amp; Expenses (amount, due day, payday). Changes you made to them on a month page are undone.</label>
+        </div>
+        <button class="btn btn-sm btn-primary">Resync now</button>
+        <span class="resync-busy text-muted ms-1 d-none"><span class="spinner-border spinner-border-sm me-1"></span> Working…</span>
+    </form>
+</details>

@@ -116,12 +116,12 @@ public class BudgetBuilder(BudgetDbContext db)
 
     /// <summary>
     /// After a paycheck's settings change on Pay &amp; Schedule, brings its paydays from today on up to date in this
-    /// month's and later budgets: the new name, the new amount (paydays whose amount was changed by hand keep
-    /// theirs), and the new schedule (paydays that no longer fall on the schedule go, missing ones are added, and
+    /// month's and later budgets: the new name, the new amount (paydays whose amount was changed by hand on the
+    /// month page keep theirs), and the new schedule (paydays that no longer fall on the schedule go, missing ones are added, and
     /// bills on a removed payday move to the right one). Paydays moved by hand and archived months are left alone.
     /// Returns how many paydays changed.
     /// </summary>
-    public Task<int> UpdateIncomeInFutureMonthsAsync(IncomeSource source, decimal oldAmount) => Exclusive(async () =>
+    public Task<int> UpdateIncomeInFutureMonthsAsync(IncomeSource source) => Exclusive(async () =>
     {
         var rules = await db.GetRulesAsync();
         var today = DateTime.Today;
@@ -144,7 +144,7 @@ public class BudgetBuilder(BudgetDbContext db)
                     continue;
                 }
                 if (pay.Label != source.Name) pay.Label = source.Name;
-                if (pay.BaseAmount == oldAmount && pay.BaseAmount != source.TakeHomeAmount)
+                if (!pay.AmountSetByHand && pay.BaseAmount != source.TakeHomeAmount)
                 {
                     pay.BaseAmount = source.TakeHomeAmount;
                     changed++;

@@ -52,12 +52,17 @@ If it says in-memory when you expected MySQL, check that `appsettings.json` has 
 
 Data entered in testing mode does not carry over to MySQL.
 
-## Changing a paycheck
+## Changing a paycheck, and Resync everything
 
 Saving a paycheck on Pay & Schedule updates its paydays from today on in this month's and later budgets: the new
-name and take-home pay (a payday whose amount you changed by hand on a month page keeps it), and a new schedule
+name and take-home pay (a payday whose amount you change by hand on a month page keeps it), and a new schedule
 (paydays that no longer fall on it are removed, missing ones added, and bills on a removed payday move to the
 right one). Paydays before today, paydays moved by hand and archived months stay as they were.
+
+*Resync everything* (on Monthly Budgets and each month page) brings this month and every later one up to date with
+Pay & Schedule, Bills & Expenses and Debt Payoff: paychecks (amounts, dates, Brad's rule), missing bills, duplicates,
+and the extra debt payments. Tick *Also reset unpaid bills* to put unpaid bills back to their amount, due day and
+payday from Bills & Expenses as well. Past paydays, pending or complete items and paychecks changed by hand stay.
 
 ## Check stubs
 

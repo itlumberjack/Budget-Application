@@ -378,6 +378,9 @@ namespace BudgetApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<bool>("AmountSetByHand")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<decimal>("BaseAmount")
                         .HasColumnType("decimal(12,2)");
 

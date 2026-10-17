@@ -86,6 +86,39 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         return RedirectToMonth(budget);
     }
 
+    /// <summary>
+    /// "Resync everything": rebuilds this month's and later open budgets from the current settings. Paychecks follow
+    /// Pay &amp; Schedule and Brad's rule, missing bills are added, duplicates removed, and the extra debt payments
+    /// placed again. With resetBills, unpaid bills also go back to their amount, due day and payday on Bills &amp;
+    /// Expenses. Past paydays, pending or complete items and paychecks changed by hand are kept.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Resync(bool resetBills, string? returnTo)
+    {
+        await builder.KeepMonthsCurrentAsync();
+        var moved = await builder.ApplyRulesToCurrentAndFutureMonthsAsync();
+        await builder.RedateMonthEndPaychecksAsync();
+        var paydays = 0;
+        foreach (var source in await db.IncomeSources.ToListAsync())
+            paydays += await builder.UpdateIncomeInFutureMonthsAsync(source);
+        var bills = 0;
+        foreach (var id in await db.MonthlyBudgets.FromThisMonth().Where(b => !b.IsArchived).Select(b => b.Id).ToListAsync())
+            bills += (await builder.SyncAsync(id)).debts;
+        if (resetBills)
+        {
+            var last = Dates.ThisMonth.AddMonths(-1);
+            foreach (var debt in await db.RecurringDebts.Where(d => d.IsActive).ToListAsync())
+                await builder.CarryForwardAsync(debt.Id, last.Year, last.Month, null, dueDayChanged: true);
+        }
+        var duplicates = await builder.RemoveDuplicateBillsAsync();
+        await builder.SpreadDebtExtraAsync();
+        TempData["Message"] = $"Resynced this month and every later one: {paydays + moved} payday change(s), {bills} missing bill(s) added"
+            + (duplicates > 0 ? $", {duplicates} duplicate(s) removed" : "")
+            + (resetBills ? ", unpaid bills reset to Bills & Expenses" : "") + ", and the extra debt payments placed again.";
+        return returnTo is { } r && r.Split('-') is [var y, var m] && int.TryParse(y, out var year) && int.TryParse(m, out var month)
+            ? RedirectToMonth(year, month) : RedirectToAction(nameof(Index));
+    }
+
     /// <summary>Archives a month by hand: hidden from the main list and read-only.</summary>
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Archive(int id)
@@ -168,6 +201,7 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         var pay = await db.PayPeriods.Include(p => p.MonthlyBudget).FirstOrDefaultAsync(p => p.Id == id);
         if (pay is null) return NotFound();
         if (Archived(pay.MonthlyBudget!, out var locked)) return locked;
+        if (pay.BaseAmount != baseAmount) pay.AmountSetByHand = true;
         pay.BaseAmount = baseAmount;
         pay.PayDate = payDate;
         await db.SaveChangesAsync();
