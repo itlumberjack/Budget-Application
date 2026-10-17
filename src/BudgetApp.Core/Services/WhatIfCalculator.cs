@@ -66,13 +66,13 @@ public static class WhatIfCalculator
         foreach (var n in scenario.NewLoans)
             after.Add(new DebtInput(nextId--, n.Name, n.Balance, n.Apr, n.MinimumPayment, null));
 
-        var extra = scenario.ExtraMonthly ?? settings.ExtraMonthly;
+        var extra = (scenario.ExtraMonthly ?? settings.ExtraMonthly) + settings.PaidOffPayments;
         var strategy = scenario.Strategy ?? settings.Strategy;
         // A lump sum in the question comes on top of the one-time extras already planned.
         var lumps = settings.LumpSums.ToList();
         if (scenario.OneTimeAmount is decimal oneTime) lumps.Add(new LumpSum(scenario.OneTimeMonth ?? firstMonth, oneTime));
 
-        var before = DebtPlanner.Plan(debts, settings.Strategy, settings.ExtraMonthly, firstMonth, settings.LumpSums);
+        var before = DebtPlanner.Plan(debts, settings.Strategy, settings.Snowball, firstMonth, settings.LumpSums);
         var plan = DebtPlanner.Plan(after, strategy, extra, firstMonth, lumps);
         // When the payments go down, also show what happens if the household keeps paying what it pays now.
         PayoffPlan? samePayment = null;

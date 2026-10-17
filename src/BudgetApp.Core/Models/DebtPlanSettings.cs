@@ -29,6 +29,20 @@ public class DebtPlanSettings : ISingleRow
     [NotMapped]
     public List<LumpSum> LumpSums { get; set; } = new();
 
+    /// <summary>
+    /// The monthly payments of loans already paid off (a balance of $0), filled in by GetDebtPlanAsync. That money
+    /// rolls into the snowball.
+    /// </summary>
+    [NotMapped]
+    public decimal PaidOffPayments { get; set; }
+
+    [NotMapped]
+    public List<string> PaidOffLoans { get; set; } = new();
+
+    /// <summary>The monthly snowball the plan starts with: the extra plus what paid-off loans used to take.</summary>
+    [NotMapped]
+    public decimal Snowball => ExtraMonthly + PaidOffPayments;
+
     /// <summary>The one-time extras in a month.</summary>
     public decimal LumpSumsIn(int year, int month) => LumpSums.Where(l => l.Date.Year == year && l.Date.Month == month).Sum(l => l.Amount);
 

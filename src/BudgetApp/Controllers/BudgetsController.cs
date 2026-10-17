@@ -377,8 +377,8 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         await builder.SpreadDebtExtraAsync(budget.Id);
         var settings = await db.GetDebtPlanAsync();
         var oneTime = settings.LumpSumsIn(budget.Year, budget.Month);
-        var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
-        var target = settings.ExtraMonthly + oneTime;
+        var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null && !e.ExtraAddedByHand).SumAsync(e => e.Amount);
+        var target = await builder.SnowballInAsync(budget.Year, budget.Month) + oneTime;
         TempData["Message"] = Math.Abs(monthTotal - target) < 0.01m
             ? $"{done} The other paydays were adjusted so {budget.Title} still pays {target:C} extra."
             : $"{done} {budget.Title} now pays {monthTotal:C} extra instead of {target:C}; no other payday had room to make up the difference.";
@@ -410,8 +410,10 @@ public class BudgetsController(BudgetDbContext db, BudgetBuilder builder, MonthS
         {
             var settings = await db.GetDebtPlanAsync();
             var oneTime = settings.LumpSumsIn(budget.Year, budget.Month);
-            var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null).SumAsync(e => e.Amount);
-            settings.ExtraMonthly = Math.Max(0, monthTotal - oneTime);
+            var monthTotal = await db.BudgetExpenses.Where(e => e.MonthlyBudgetId == budget.Id && e.ExtraForDebtId != null && !e.ExtraAddedByHand).SumAsync(e => e.Amount);
+            // Payments freed up by paid-off loans stay in the snowball on their own.
+            var freed = await builder.SnowballInAsync(budget.Year, budget.Month) - settings.ExtraMonthly;
+            settings.ExtraMonthly = Math.Max(0, monthTotal - oneTime - Math.Max(0, freed));
             await db.SaveChangesAsync();
             await builder.SpreadDebtExtraAsync(after: (budget.Year, budget.Month));
             TempData["Message"] = $"The extra debt payment is now {settings.ExtraMonthly:C} a month, spread over the paydays in later months.";

@@ -197,6 +197,12 @@ The snowball goes to one loan at a time: all the extra goes to the first loan in
 on only once it's paid off (the rest of that month's extra goes to the next loan). A loan with a promo the plan
 would otherwise miss moves to the front of the line. The Debt Payoff page lists this month's shares under *Extra by payday*.
 
+Once the plan has a loan paid off, it drops off the budget: no more payments on it in the months after. If its
+regular payment is more than what's left in the month it's paid off, that payment is cut to what's left and marked
+*last payment*. Its payment then rolls into the snowball, so the next loan gets the extra plus that payment. A loan
+with an amount owed of $0 counts as paid off now: it's off this month (a payday that has already passed keeps its
+payment) and every later one, and the Debt Payoff page shows how much paid-off loans add to the snowball.
+
 Next to each loan payment and extra share on a month page is what's left on that loan after it ("$250 left",
 or "paid off"), counting that month's payments in payday order. This month starts from the amount owed on
 Debt Payoff; later months start from the plan's projected balance. Debt Payoff shows the same numbers in

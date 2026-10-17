@@ -61,6 +61,9 @@ public class BudgetExpense
     /// </summary>
     public bool ExtraAddedByHand { get; set; }
 
+    /// <summary>A loan's last payment: set to what's left on the loan in the month the payoff plan pays it off.</summary>
+    public bool IsFinalPayment { get; set; }
+
     /// <summary>A removed share of the extra payment, kept only so respreading leaves its payday out.</summary>
     [NotMapped]
     public bool IsRemovedExtra => ExtraForDebtId is not null && ExtraPinned && Amount == 0;
